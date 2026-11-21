@@ -1,0 +1,8 @@
+# Local SQLite database files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+db.sqlite3
+db.sqlite3-journal
+dhwani.db
