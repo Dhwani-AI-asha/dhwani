@@ -6,7 +6,6 @@ import {
   Trash2, 
   ArrowRight, 
   Users, 
-  ShieldCheck, 
   Radio, 
   Sparkles,
   MapPin,
@@ -162,7 +161,7 @@ export const NewVisitRecording: React.FC = () => {
           <div className="pt-1">
             <span className="inline-flex items-center space-x-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              <span>Detected Language: Hindi (हिन्दी)</span>
+              <span>Hindi + English (code-mix)</span>
             </span>
             <p className="text-[11px] text-slate-400 mt-1">
               Automatic detection active. Speak comfortably in either Hindi or English.
@@ -203,14 +202,6 @@ export const NewVisitRecording: React.FC = () => {
               <span className="inline-block w-1.5 h-4 bg-teal-700 ml-1 translate-y-0.5 animate-pulse"></span>
             </p>
           )}
-
-          <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[11px] text-slate-500">
-            <span className="flex items-center space-x-1.5 text-slate-600">
-              <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
-              <span>AI Audio Clean: Wind & Ambient Noise Suppressed</span>
-            </span>
-            <span className="font-semibold text-slate-700">ASR Confidence: 98.4%</span>
-          </div>
         </div>
 
         {/* Bottom Control Buttons */}
