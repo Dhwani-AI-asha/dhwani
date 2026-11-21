@@ -2,10 +2,9 @@
  * Client for the voice backend's /report, /report/correct, /report/voice-correct, and /report/status endpoints.
  * Never throws: always resolves to { ok: true, ... } or { ok: false, error, ... }.
  */
-const BASE_URL =
-  (typeof import.meta !== 'undefined' &&
-    (import.meta as unknown as { env?: { VITE_VOICE_HTTP_URL?: string } }).env?.VITE_VOICE_HTTP_URL) ||
-  'http://localhost:8000';
+import { getVoiceHttpBaseUrl } from './apiConfig.ts';
+
+const BASE_URL = getVoiceHttpBaseUrl();
 
 // The model can take up to ~60 s on the server, so wait a little longer here.
 const REQUEST_TIMEOUT_MS = 90_000;

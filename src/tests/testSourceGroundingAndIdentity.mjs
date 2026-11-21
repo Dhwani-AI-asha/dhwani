@@ -6,6 +6,7 @@
  * consistent state/read-back/backend-payload/patient-resolution behavior.
  */
 import assert from 'node:assert/strict';
+import { normalizeHttpBaseUrl, normalizeWsUrl } from '../lib/apiConfig.ts';
 import {
   buildBackendReportPayload,
   ensureTranscriptNamedPatient,
@@ -224,6 +225,31 @@ await assert.rejects(
   'Rejects saving visit when patient identity is missing'
 );
 check(true, 'resolveVisitPatientId blocks saving visit with missing name');
+
+// ---------------------------------------------------------------------------
+// 6. Deployment URL Normalization (HTTPS / WSS & Trailing Slashes)
+// ---------------------------------------------------------------------------
+console.log('\n--- 6. Deployment URL & WSS Compatibility ---');
+check(
+  normalizeHttpBaseUrl('https://dhwani-api.onrender.com///', 'http://localhost:8001') ===
+    'https://dhwani-api.onrender.com',
+  'Strips trailing slashes from HTTPS Render URL'
+);
+check(
+  normalizeWsUrl('wss://dhwani-api.onrender.com/ws/stt/', undefined) ===
+    'wss://dhwani-api.onrender.com/ws/stt',
+  'Preserves explicit wss:// WebSocket URL without double slashes'
+);
+check(
+  normalizeWsUrl('https://dhwani-api.onrender.com/', undefined) ===
+    'wss://dhwani-api.onrender.com/ws/stt',
+  'Upgrades https:// base URL cleanly to wss://.../ws/stt for Vercel'
+);
+check(
+  normalizeWsUrl(undefined, 'https://dhwani-api.onrender.com') ===
+    'wss://dhwani-api.onrender.com/ws/stt',
+  'Derives wss://.../ws/stt from VITE_VOICE_HTTP_URL fallback'
+);
 
 console.log(`\n========================================`);
 console.log(`Result: ${passed} / ${total} tests passed`);

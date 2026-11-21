@@ -3,13 +3,24 @@ Main FastAPI application entry point for Dhwani backend.
 """
 
 import os
+import sys
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# Ensure both repo root (for ai_medical, voice) and backend/ (for app.*) are importable
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_PROJECT_ROOT = _BACKEND_DIR.parent
+for _p in (str(_PROJECT_ROOT), str(_BACKEND_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 from app.config import settings
 from app.database import init_db
 from app.api.v1.router import api_router
+from voice.main import voice_router
+from voice.report_api import router as report_router
 
 
 @asynccontextmanager
@@ -36,8 +47,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount API v1 router
+# Mount unified routers (Patient/Visit DB v1 + Voice STT/TTS + AI Report Generation/Correction)
 app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(voice_router)
+app.include_router(report_router)
 
 
 @app.get("/", tags=["Health"])

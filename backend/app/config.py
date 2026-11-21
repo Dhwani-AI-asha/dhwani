@@ -11,8 +11,9 @@ from typing import Optional
 # Resolve base directory (backend/)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Default to a local SQLite database in the backend directory (matches .gitignore db.sqlite3)
-DEFAULT_DB_PATH = BASE_DIR / "db.sqlite3"
+# On Render without a persistent disk mount at /var/data, default to writable /tmp/dhwani_demo.db
+_DEFAULT_DEMO_DIR = Path("/tmp") if os.getenv("RENDER") and not os.path.exists("/var/data") else BASE_DIR
+DEFAULT_DB_PATH = _DEFAULT_DEMO_DIR / ("dhwani_demo.db" if _DEFAULT_DEMO_DIR == Path("/tmp") else "db.sqlite3")
 DEFAULT_DB_URL = f"sqlite:///{DEFAULT_DB_PATH.as_posix()}"
 
 

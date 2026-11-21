@@ -11,6 +11,8 @@
  * - { "type": "error", "message": "..." }
  */
 
+import { getVoiceWsUrl } from './apiConfig.ts';
+
 export type VoiceStatus = 'idle' | 'connecting' | 'live' | 'error';
 
 export interface VoiceClientCallbacks {
@@ -58,9 +60,7 @@ export class VoiceClient {
 
     return new Promise<void>((resolve, reject) => {
       try {
-        const wsUrl =
-          (import.meta as unknown as { env?: { VITE_VOICE_WS_URL?: string } }).env?.VITE_VOICE_WS_URL ||
-          'ws://localhost:8000/ws/stt';
+        const wsUrl = getVoiceWsUrl();
         const socket = new WebSocket(wsUrl);
         this.socket = socket;
         socket.binaryType = 'arraybuffer';

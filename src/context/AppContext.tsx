@@ -22,6 +22,7 @@ import {
   predefinedDangerSigns
 } from '../data/mockData';
 import { VoiceClient, voiceClient, VoiceStatus } from '../lib/voiceClient';
+import { getVoiceHttpBaseUrl } from '../lib/apiConfig';
 import { speak, stopSpeaking } from '../lib/speak';
 import {
   detectValidatedDangerSignFromText,
@@ -1811,10 +1812,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Probe backend server reachability before auto-sync
   const checkBackendReachable = async (): Promise<boolean> => {
-    const voiceBase =
-      (typeof import.meta !== 'undefined' &&
-        (import.meta as unknown as { env?: { VITE_VOICE_HTTP_URL?: string } }).env?.VITE_VOICE_HTTP_URL) ||
-      'http://localhost:8000';
+    const voiceBase = getVoiceHttpBaseUrl();
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);

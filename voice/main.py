@@ -3,23 +3,30 @@ import json
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+from fastapi import APIRouter, FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import requests
 import websockets
 
-# Load environment variables from project root .env without logging or printing the key
+# Load environment variables from project root .env without logging or printing keys
 env_path = Path(__file__).resolve().parent.parent / ".env"
-if env_path.exists():
-    load_dotenv(dotenv_path=env_path)
-else:
-    load_dotenv()
+if load_dotenv is not None:
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path)
+    else:
+        load_dotenv()
 
-# Gnani API key read from .env - never printed or logged
-GNANI_API_KEY = os.getenv("GNANI_API_KEY")
+
+def _get_gnani_api_key() -> str:
+    return (os.getenv("GNANI_API_KEY") or "").strip()
+
 
 # Upstream Gnani STT streaming endpoint
 GNANI_WS_URL = "wss://api.vachana.ai/stt/v3/stream"
@@ -27,16 +34,19 @@ GNANI_WS_URL = "wss://api.vachana.ai/stt/v3/stream"
 # Upstream Gnani TTS REST endpoint
 GNANI_TTS_URL = "https://api.vachana.ai/api/v1/tts/inference"
 
-# Headers copied from voice/test_stream.py
-HEADERS = {
-    "x-api-key-id": GNANI_API_KEY,
-    "model": "prisma-v3.0",
-    "language_code": "hi-IN",
-    "x-sample-rate": "16000",
-    "format": "transcribe",
-}
+
+def _build_gnani_ws_headers(api_key: str) -> dict:
+    return {
+        "x-api-key-id": api_key,
+        "model": "prisma-v3.0",
+        "language_code": "hi-IN",
+        "x-sample-rate": "16000",
+        "format": "transcribe",
+    }
+
 
 app = FastAPI(title="Voice STT Backend")
+voice_router = APIRouter()
 
 try:
     from voice.report_api import router as report_router  # noqa: E402
@@ -76,13 +86,14 @@ class TTSRequest(BaseModel):
     language: str = "hi-IN"
 
 
-@app.post("/tts")
+@voice_router.post("/tts")
 async def tts_endpoint(req: TTSRequest):
     """
     Synthesize speech using Gnani Timbre REST inference (timbre-v2.5, Hindi female voice 'Nalini').
     Returns WAV audio bytes with content-type audio/wav.
     """
-    if not GNANI_API_KEY:
+    gnani_key = _get_gnani_api_key()
+    if not gnani_key:
         raise HTTPException(
             status_code=500,
             detail="GNANI_API_KEY is not configured in the server environment",
@@ -102,7 +113,7 @@ async def tts_endpoint(req: TTSRequest):
         lang_code = lang
 
     headers = {
-        "X-API-Key-ID": GNANI_API_KEY,
+        "X-API-Key-ID": gnani_key,
         "Content-Type": "application/json",
     }
 
@@ -145,15 +156,15 @@ async def tts_endpoint(req: TTSRequest):
 
 
 @app.get("/")
-@app.get("/test")
-@app.get("/test.html")
+@voice_router.get("/test")
+@voice_router.get("/test.html")
 async def get_test_page():
     """Serve voice/test.html for testing in the browser."""
     html_path = Path(__file__).resolve().parent / "test.html"
     return FileResponse(html_path, media_type="text/html")
 
 
-@app.websocket("/ws/stt")
+@voice_router.websocket("/ws/stt")
 async def websocket_stt_endpoint(websocket: WebSocket):
     """
     WebSocket endpoint:
@@ -164,6 +175,16 @@ async def websocket_stt_endpoint(websocket: WebSocket):
     - Reconnects once if Gnani disconnects and emits {"type": "error", "message": "..."}.
     """
     await websocket.accept()
+
+    gnani_key = _get_gnani_api_key()
+    if not gnani_key:
+        await websocket.send_json({
+            "type": "error",
+            "message": "GNANI_API_KEY is not configured in the server environment.",
+        })
+        await websocket.close(code=1011)
+        return
+    ws_headers = _build_gnani_ws_headers(gnani_key)
 
     audio_queue = asyncio.Queue()
     turn_segments = []
@@ -209,7 +230,7 @@ async def websocket_stt_endpoint(websocket: WebSocket):
         try:
             # Connect to Gnani STT WebSocket
             async with websockets.connect(
-                GNANI_WS_URL, additional_headers=HEADERS
+                GNANI_WS_URL, additional_headers=ws_headers
             ) as gnani_ws:
 
                 # Send audio in 1024-byte frames to Gnani
@@ -336,6 +357,8 @@ async def websocket_stt_endpoint(websocket: WebSocket):
             except Exception:
                 pass
 
+
+app.include_router(voice_router)
 
 if __name__ == "__main__":
     import uvicorn

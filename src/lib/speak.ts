@@ -1,12 +1,10 @@
 /**
  * Text-to-Speech client for Dhwani voice backend.
- * POSTs to http://localhost:8000/tts and plays the returned WAV audio.
+ * POSTs to /tts on the configured voice/backend URL and plays the returned WAV audio.
  */
+import { getVoiceHttpBaseUrl } from './apiConfig.ts';
 
-const VOICE_HTTP_BASE =
-  (typeof import.meta !== 'undefined' &&
-    (import.meta as unknown as { env?: { VITE_VOICE_HTTP_URL?: string } }).env?.VITE_VOICE_HTTP_URL) ||
-  'http://localhost:8000';
+const VOICE_HTTP_BASE = getVoiceHttpBaseUrl();
 
 let activeAudio: HTMLAudioElement | null = null;
 let activeResolve: ((value: boolean) => void) | null = null;

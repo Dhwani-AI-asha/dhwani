@@ -1,9 +1,7 @@
 import type { Beneficiary, StructuredVisitData } from '../types/index.ts';
+import { getPatientApiBaseUrl } from './apiConfig.ts';
 
-const PATIENT_API_BASE =
-  (typeof import.meta !== 'undefined' &&
-    (import.meta as unknown as { env?: { VITE_PATIENT_API_URL?: string } }).env?.VITE_PATIENT_API_URL) ||
-  'http://localhost:8001';
+const PATIENT_API_BASE = getPatientApiBaseUrl();
 
 export interface BackendPatientRecord {
   patient_id: string;
