@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { 
   AshaWorker,
   Beneficiary, 
@@ -16,6 +16,7 @@ import {
   mockVisitHistory,
   predefinedDangerSigns
 } from '../data/mockData';
+import { voiceClient, VoiceStatus } from '../lib/voiceClient';
 
 interface AppContextType {
   // Authentication
@@ -43,6 +44,10 @@ interface AppContextType {
   pauseRecording: () => void;
   stopRecordingAndReview: () => void;
   cancelRecording: () => void;
+  liveSegments: string[];
+  liveTranscript: string;
+  voiceStatus: VoiceStatus;
+  voiceError: string | null;
   
   // Audio playback states
   isPlayingAudio: boolean;
@@ -103,10 +108,46 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [followUpTasks, setFollowUpTasks] = useState<FollowUpTask[]>(mockFollowUpTasks);
   const [visitHistory, setVisitHistory] = useState<VisitHistoryItem[]>(mockVisitHistory);
 
-  // Recording simulation
+  // Voice & Recording states
   const [isRecording, setIsRecording] = useState<boolean>(false);
-  const [recordingSeconds, setRecordingSeconds] = useState<number>(102);
+  const [recordingSeconds, setRecordingSeconds] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [liveSegments, setLiveSegments] = useState<string[]>([]);
+  const [liveTranscript, setLiveTranscript] = useState<string>('');
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+
+  const liveTranscriptRef = useRef<string>('');
+
+  // Wire up VoiceClient callbacks
+  useEffect(() => {
+    voiceClient.setCallbacks({
+      onSegment: (text: string) => {
+        const trimmed = text.trim();
+        if (!trimmed) return;
+        setLiveSegments((prev) => {
+          const next = [...prev, trimmed];
+          const fullText = next.join(' ');
+          liveTranscriptRef.current = fullText;
+          setLiveTranscript(fullText);
+          return next;
+        });
+      },
+      onTurn: (_text: string) => {
+        // Server emits joined turn after silence; segments already kept in sync
+      },
+      onError: (errMsg: string) => {
+        setVoiceError(errMsg);
+      },
+      onStatus: (status: VoiceStatus) => {
+        setVoiceStatus(status);
+      },
+    });
+
+    return () => {
+      voiceClient.stop();
+    };
+  }, []);
 
   // Audio Playback simulation
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
@@ -150,6 +191,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const logout = () => {
+    voiceClient.stop();
     stopReadBack();
     clearDangerAlert();
     setCurrentUser(null);
@@ -185,25 +227,58 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [isPlayingAudio]);
 
   const startRecording = () => {
+    setLiveSegments([]);
+    setLiveTranscript('');
+    liveTranscriptRef.current = '';
+    setVoiceError(null);
     setIsRecording(true);
     setIsPaused(false);
     setRecordingSeconds(0);
     setCurrentScreen('new-visit');
+
+    voiceClient.start().catch((err: unknown) => {
+      console.error('Failed to start voice client:', err);
+    });
   };
 
   const pauseRecording = () => {
-    setIsPaused(prev => !prev);
+    setIsPaused(prev => {
+      const willBePaused = !prev;
+      if (willBePaused) {
+        voiceClient.pause();
+      } else {
+        voiceClient.resume();
+      }
+      return willBePaused;
+    });
   };
 
   const stopRecordingAndReview = () => {
+    voiceClient.stop();
     setIsRecording(false);
     setIsPaused(false);
+
+    // Save joined text into activeVisit.originalTranscript
+    const joinedText = liveTranscriptRef.current.trim();
+    if (joinedText) {
+      setActiveVisit(prev => ({
+        ...prev,
+        originalTranscript: joinedText,
+      }));
+    }
+
     setCurrentScreen('review-transcript');
   };
 
   const cancelRecording = () => {
+    voiceClient.stop();
     setIsRecording(false);
     setIsPaused(false);
+    setRecordingSeconds(0);
+    setLiveSegments([]);
+    setLiveTranscript('');
+    liveTranscriptRef.current = '';
+    setVoiceError(null);
     setCurrentScreen('dashboard');
   };
 
@@ -461,6 +536,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       pauseRecording,
       stopRecordingAndReview,
       cancelRecording,
+      liveSegments,
+      liveTranscript,
+      voiceStatus,
+      voiceError,
       isPlayingAudio,
       audioCurrentTime,
       togglePlayAudio,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   Mic, 
   Pause, 
@@ -26,24 +26,11 @@ export const NewVisitRecording: React.FC = () => {
     isPaused,
     pauseRecording,
     stopRecordingAndReview,
-    cancelRecording
+    cancelRecording,
+    liveTranscript,
+    voiceStatus,
+    voiceError
   } = useApp();
-
-  const [streamIndex, setStreamIndex] = useState(0);
-
-  const fullLiveText = "पूजा देवी का 32वां हफ्ता चल रहा है। आज बीपी 130/85 था। पिछले तीन दिनों से पैरों में हल्की सूजन (edema) है और सिरदर्द की शिकायत कर रही हैं। आयरन की गोलियां नियमित ले रही हैं...";
-
-  // Simulated typing / streaming effect
-  useEffect(() => {
-    if (isRecording && !isPaused) {
-      const timer = setInterval(() => {
-        setStreamIndex(prev => (prev < fullLiveText.length ? prev + 2 : fullLiveText.length));
-      }, 150);
-      return () => clearInterval(timer);
-    }
-  }, [isRecording, isPaused]);
-
-  const displayedText = fullLiveText.slice(0, Math.max(30, streamIndex));
 
   // Format time mm:ss
   const formatTime = (totalSeconds: number) => {
@@ -152,9 +139,13 @@ export const NewVisitRecording: React.FC = () => {
         {/* Status & Audio Wave */}
         <div className="space-y-2">
           <div className="flex items-center justify-center space-x-2 text-sm font-semibold text-slate-800">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></span>
+            <span className={`w-2.5 h-2.5 rounded-full ${voiceStatus === 'error' ? 'bg-red-600' : voiceStatus === 'connecting' ? 'bg-amber-500 animate-ping' : 'bg-red-600 animate-pulse'}`}></span>
             <span>
-              {isPaused ? 'Recording paused' : 'Recording in progress...'} {formatTime(recordingSeconds)}
+              {voiceStatus === 'connecting' 
+                ? 'Connecting...' 
+                : isPaused 
+                  ? 'Recording paused' 
+                  : 'Recording in progress...'} {formatTime(recordingSeconds)}
             </span>
           </div>
 
@@ -186,16 +177,32 @@ export const NewVisitRecording: React.FC = () => {
               <Radio className="w-3.5 h-3.5 text-teal-600" />
               <span>LIVE SPEECH TRANSCRIPTION STREAM</span>
             </span>
-            <span className="flex items-center space-x-1 text-emerald-700">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>Streaming</span>
+            <span className={`flex items-center space-x-1 ${voiceStatus === 'error' ? 'text-red-600' : voiceStatus === 'connecting' ? 'text-amber-700' : 'text-emerald-700'}`}>
+              <span className={`w-2 h-2 rounded-full ${voiceStatus === 'error' ? 'bg-red-500' : voiceStatus === 'connecting' ? 'bg-amber-500 animate-ping' : 'bg-emerald-500 animate-pulse'}`}></span>
+              <span>{voiceStatus === 'connecting' ? 'Connecting...' : voiceStatus === 'error' ? 'Error' : 'Streaming'}</span>
             </span>
           </div>
 
-          <p className="text-sm font-medium text-slate-800 leading-relaxed font-['Noto_Sans_Devanagari',sans-serif]">
-            "{displayedText}"
-            <span className="inline-block w-1.5 h-4 bg-teal-700 ml-1 translate-y-0.5 animate-pulse"></span>
-          </p>
+          {voiceError ? (
+            <p className="text-sm font-medium text-red-600 leading-relaxed">
+              Error: {voiceError}
+            </p>
+          ) : voiceStatus === 'connecting' && !liveTranscript ? (
+            <p className="text-sm font-medium text-slate-500 leading-relaxed italic">
+              Connecting...
+              <span className="inline-block w-1.5 h-4 bg-teal-700 ml-1 translate-y-0.5 animate-pulse"></span>
+            </p>
+          ) : liveTranscript ? (
+            <p className="text-sm font-medium text-slate-800 leading-relaxed font-['Noto_Sans_Devanagari',sans-serif]">
+              "{liveTranscript}"
+              <span className="inline-block w-1.5 h-4 bg-teal-700 ml-1 translate-y-0.5 animate-pulse"></span>
+            </p>
+          ) : (
+            <p className="text-sm font-medium text-slate-400 leading-relaxed italic">
+              Listening... Speak naturally in Hindi or English.
+              <span className="inline-block w-1.5 h-4 bg-teal-700 ml-1 translate-y-0.5 animate-pulse"></span>
+            </p>
+          )}
 
           <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[11px] text-slate-500">
             <span className="flex items-center space-x-1.5 text-slate-600">

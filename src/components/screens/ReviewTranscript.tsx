@@ -17,6 +17,7 @@ import { useApp } from '../../context/AppContext';
 export const ReviewTranscript: React.FC = () => {
   const { 
     activeBeneficiary, 
+    activeVisit,
     setCurrentScreen, 
     startRecording,
     isPlayingAudio,
@@ -215,29 +216,9 @@ export const ReviewTranscript: React.FC = () => {
           </div>
         </div>
 
-        {/* Interactive Highlighted Transcript */}
-        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm leading-relaxed text-slate-800 font-['Noto_Sans_Devanagari',sans-serif]">
-          पूजा देवी, उम्र 24 वर्ष, गर्भावस्था का 32वां सप्ताह (3rd trimester)। आज गृह भेंट में बीपी मापा गया जो{' '}
-          <span className="inline-block bg-emerald-100/90 text-emerald-900 font-bold px-2 py-0.5 rounded border border-emerald-300 mx-1 cursor-pointer hover:bg-emerald-200 transition">
-            130/85 mmHg
-          </span>{' '}
-          आया। नाड़ी 78 प्रति मिनट। लाभार्थी ने बताया कि पिछले 3 दिनों से दोनों पैरों में सूजन ({' '}
-          <span className="inline-block bg-red-100 text-red-900 font-bold px-2 py-0.5 rounded border border-red-300 mx-1 cursor-pointer hover:bg-red-200 transition">
-            bilateral pedal edema
-          </span>{' '}
-          ) आ रही है और कल शाम से हल्का{' '}
-          <span className="inline-block bg-red-100 text-red-900 font-bold px-2 py-0.5 rounded border border-red-300 mx-1 cursor-pointer hover:bg-red-200 transition">
-            सिरदर्द
-          </span>{' '}
-          है। भ्रूण की हलचल (fetal movement) सामान्य है। आयरन और फोलिक एसिड की गोलियां रोज ले रही हैं, अभी{' '}
-          <span className="inline-block bg-emerald-100/90 text-emerald-900 font-bold px-2 py-0.5 rounded border border-emerald-300 mx-1 cursor-pointer hover:bg-emerald-200 transition">
-            15 गोलियां बची हैं
-          </span>
-          । टिटनेस का दूसरा टीका ({' '}
-          <span className="inline-block bg-teal-100 text-teal-900 font-bold px-2 py-0.5 rounded border border-teal-300 mx-1 cursor-pointer hover:bg-teal-200 transition">
-            TT-2
-          </span>{' '}
-          ) पिछले महीने लग चुका है। वजन 56 किलो है, पिछले महीने से 2 किलो बढ़ा है।
+        {/* Transcript as Plain Text */}
+        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm leading-relaxed text-slate-800 font-['Noto_Sans_Devanagari',sans-serif] whitespace-pre-wrap">
+          {activeVisit.originalTranscript || 'No transcript recorded.'}
         </div>
 
         <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
