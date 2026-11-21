@@ -36,3 +36,8 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+*.wav
+*.mp4
+*.m4a
+__pycache__/
