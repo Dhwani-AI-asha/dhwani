@@ -23,7 +23,8 @@ from app.services.patient_service import (
     create_patient,
     get_patient_by_id,
     get_patients,
-    update_patient
+    update_patient,
+    delete_patient
 )
 from app.services.visit_service import get_visits_by_patient_id
 from app.services.care_promise_service import get_care_promises
@@ -111,7 +112,27 @@ def update_patient_info(
 
     updated = update_patient(db=db, patient=patient, patient_in=patient_in)
     return updated
+@router.delete(
+    "/{patient_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a patient",
+    description="Deletes a patient and their dependent records."
+)
+def delete_patient_record(
+    patient_id: str,
+    db: Session = Depends(get_db)
+):
+    """Delete a patient by ID. Returns 404 if the patient is not found."""
+    patient = get_patient_by_id(db=db, patient_id=patient_id)
 
+    if not patient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Patient with ID '{patient_id}' not found."
+        )
+
+    delete_patient(db=db, patient=patient)
+    return None
 
 @router.get(
     "/{patient_id}/visits",

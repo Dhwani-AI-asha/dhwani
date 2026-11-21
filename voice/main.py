@@ -4,11 +4,8 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
-import requests
 import websockets
 
 # Load environment variables from project root .env without logging or printing the key
@@ -24,9 +21,6 @@ GNANI_API_KEY = os.getenv("GNANI_API_KEY")
 # Upstream Gnani STT streaming endpoint
 GNANI_WS_URL = "wss://api.vachana.ai/stt/v3/stream"
 
-# Upstream Gnani TTS REST endpoint
-GNANI_TTS_URL = "https://api.vachana.ai/api/v1/tts/inference"
-
 # Headers copied from voice/test_stream.py
 HEADERS = {
     "x-api-key-id": GNANI_API_KEY,
@@ -37,88 +31,6 @@ HEADERS = {
 }
 
 app = FastAPI(title="Voice STT Backend")
-
-# Enable CORS for frontend requests
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-class TTSRequest(BaseModel):
-    text: str
-    language: str = "hi-IN"
-
-
-@app.post("/tts")
-async def tts_endpoint(req: TTSRequest):
-    """
-    Synthesize speech using Gnani Timbre REST inference (timbre-v2.5, Hindi female voice 'Nalini').
-    Returns WAV audio bytes with content-type audio/wav.
-    """
-    if not GNANI_API_KEY:
-        raise HTTPException(
-            status_code=500,
-            detail="GNANI_API_KEY is not configured in the server environment",
-        )
-
-    text = req.text.strip()
-    if not text:
-        raise HTTPException(status_code=400, detail="Text field cannot be empty")
-
-    # Map language code to standard locale if needed (e.g. 'hi' -> 'hi-IN')
-    lang = (req.language or "hi-IN").strip()
-    if lang.lower() in ("hi", "hindi", "hi-in", "hi_in"):
-        lang_code = "hi-IN"
-    elif "-" not in lang and len(lang) == 2:
-        lang_code = f"{lang.lower()}-IN"
-    else:
-        lang_code = lang
-
-    headers = {
-        "X-API-Key-ID": GNANI_API_KEY,
-        "Content-Type": "application/json",
-    }
-
-    payload = {
-        "text": text,
-        "voice": "Nalini",
-        "model": "timbre-v2.5",
-        "language": lang_code,
-        "speed": 1,
-        "audio_config": {
-            "encoding": "linear_pcm",
-            "container": "wav",
-            "num_channels": 1,
-            "sample_rate": 48000,
-            "sample_width": 2,
-        },
-    }
-
-    try:
-        resp = await asyncio.to_thread(
-            requests.post,
-            GNANI_TTS_URL,
-            headers=headers,
-            json=payload,
-            timeout=30,
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Failed to communicate with Gnani TTS upstream: {str(exc)}",
-        )
-
-    if resp.status_code != 200:
-        raise HTTPException(
-            status_code=resp.status_code,
-            detail=f"Gnani TTS request failed: {resp.text}",
-        )
-
-    return Response(content=resp.content, media_type="audio/wav")
 
 
 @app.get("/")

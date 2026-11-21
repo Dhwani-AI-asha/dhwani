@@ -20,14 +20,15 @@ class Settings:
     API_V1_STR: str = "/api/v1"
     DATABASE_URL: str = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
 
-    # CORS: Allow all origins in local prototype mode for Member 4 frontend integration
+    
+    # CORS: Allow local frontend development origins
     CORS_ORIGINS: list[str] = [
-        "http://localhost",
         "http://localhost:3000",
+        "http://localhost:3001",
         "http://localhost:5173",
         "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
         "http://127.0.0.1:5173",
-        "*"
     ]
 
 

@@ -17,7 +17,6 @@ import {
   predefinedDangerSigns
 } from '../data/mockData';
 import { voiceClient, VoiceStatus } from '../lib/voiceClient';
-import { speak, stopSpeaking } from '../lib/speak';
 
 interface AppContextType {
   // Authentication
@@ -119,7 +118,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const liveTranscriptRef = useRef<string>('');
-  const recordingSessionIdRef = useRef<number>(0);
 
   // Wire up VoiceClient callbacks
   useEffect(() => {
@@ -228,8 +226,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => clearInterval(interval);
   }, [isPlayingAudio]);
 
-  const startRecording = async () => {
-    const currentSessionId = ++recordingSessionIdRef.current;
+  const startRecording = () => {
     setLiveSegments([]);
     setLiveTranscript('');
     liveTranscriptRef.current = '';
@@ -238,24 +235,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIsPaused(false);
     setRecordingSeconds(0);
     setCurrentScreen('new-visit');
-    setVoiceStatus('connecting');
-
-    const DISCLOSURE_HINDI = "नमस्ते, मैं एक AI सहायक हूँ। मैं आपकी बातें सुनकर विज़िट नोट्स लिखने में मदद करती हूँ।";
-    let played = false;
-    try {
-      played = await speak(DISCLOSURE_HINDI, 'hi-IN');
-    } catch {
-      played = false;
-    }
-
-    // If recording was cancelled while disclosure was playing, don't start voice client
-    if (recordingSessionIdRef.current !== currentSessionId) {
-      return;
-    }
-
-    if (!played) {
-      setVoiceError("AI assistant disclosure could not be played");
-    }
 
     voiceClient.start().catch((err: unknown) => {
       console.error('Failed to start voice client:', err);
@@ -275,8 +254,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const stopRecordingAndReview = () => {
-    recordingSessionIdRef.current++;
-    stopSpeaking();
     voiceClient.stop();
     setIsRecording(false);
     setIsPaused(false);
@@ -294,8 +271,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const cancelRecording = () => {
-    recordingSessionIdRef.current++;
-    stopSpeaking();
     voiceClient.stop();
     setIsRecording(false);
     setIsPaused(false);
@@ -304,7 +279,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setLiveTranscript('');
     liveTranscriptRef.current = '';
     setVoiceError(null);
-    setVoiceStatus('idle');
     setCurrentScreen('dashboard');
   };
 

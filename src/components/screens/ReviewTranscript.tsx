@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Play, 
   Pause, 
@@ -13,7 +13,6 @@ import {
   VolumeX
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { saveVisit } from '../../lib/patientApi';
 
 export const ReviewTranscript: React.FC = () => {
   const { 
@@ -30,35 +29,6 @@ export const ReviewTranscript: React.FC = () => {
   const [isEditingInline, setIsEditingInline] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1.0x' | '1.2x' | '1.5x'>('1.0x');
   const [isMuted, setIsMuted] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const navTimeoutRef = useRef<any>(null);
-
-  useEffect(() => {
-    return () => {
-      if (navTimeoutRef.current) {
-        clearTimeout(navTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const handleConfirmAndSave = async () => {
-    setIsSaving(true);
-    setStatusMessage(null);
-    try {
-      const transcript = activeVisit.originalTranscript || '';
-      await saveVisit('PAT-2026-0001', transcript);
-      setStatusMessage({ type: 'success', text: 'Visit saved successfully.' });
-      navTimeoutRef.current = setTimeout(() => {
-        setCurrentScreen('verify-record');
-      }, 400);
-    } catch (err: any) {
-      const errorMsg = err?.message || 'Failed to save visit';
-      setStatusMessage({ type: 'error', text: errorMsg });
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const formatAudioTime = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -282,25 +252,6 @@ export const ReviewTranscript: React.FC = () => {
         </div>
       </div>
 
-      {/* Save Status / Error Message */}
-      {statusMessage && (
-        <div
-          role="alert"
-          className={`p-4 rounded-xl border text-xs font-semibold flex items-center space-x-2 ${
-            statusMessage.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-              : 'bg-red-50 border-red-200 text-red-700'
-          }`}
-        >
-          {statusMessage.type === 'success' ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          ) : (
-            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
-          )}
-          <span>{statusMessage.text}</span>
-        </div>
-      )}
-
       {/* Bottom Action Footer */}
       <div className="flex items-center justify-between pt-2">
         <button
@@ -313,9 +264,8 @@ export const ReviewTranscript: React.FC = () => {
         <div className="flex items-center space-x-4">
           <span className="text-xs text-slate-500 font-medium">Ready for clinical parsing</span>
           <button
-            onClick={handleConfirmAndSave}
-            disabled={isSaving}
-            className="flex items-center space-x-2 bg-teal-700 hover:bg-teal-800 text-white px-6 py-3 rounded-xl text-xs font-bold shadow-md shadow-teal-900/10 transition active:scale-95 disabled:opacity-50"
+            onClick={() => setCurrentScreen('verify-record')}
+            className="flex items-center space-x-2 bg-teal-700 hover:bg-teal-800 text-white px-6 py-3 rounded-xl text-xs font-bold shadow-md shadow-teal-900/10 transition active:scale-95"
           >
             <span>Continue to Extract & Verify Record</span>
             <ArrowRight className="w-4 h-4" />
