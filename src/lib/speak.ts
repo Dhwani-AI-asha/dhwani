@@ -4,64 +4,121 @@
  */
 
 let activeAudio: HTMLAudioElement | null = null;
+let activeResolve: ((value: boolean) => void) | null = null;
 
 /**
  * Sends text and language to the backend TTS service and plays the synthesized audio.
+ * Returns a Promise that resolves when the audio finishes playing (on the audio 'ended' event),
+ * and also resolves on error so caller execution is never blocked.
  *
  * @param text The text to synthesize into speech.
  * @param language The language code (defaults to 'hi-IN').
- * @returns Promise that resolves to the HTMLAudioElement being played.
+ * @returns Promise that resolves to true if audio played to completion, or false on error.
  */
-export async function speak(
+export function speak(
   text: string,
   language: string = 'hi-IN'
-): Promise<HTMLAudioElement> {
-  // Interrupt any existing audio playback
-  if (activeAudio) {
-    try {
-      activeAudio.pause();
-      activeAudio.currentTime = 0;
-    } catch {
-      // Ignore pause errors
-    }
-    activeAudio = null;
-  }
+): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
 
-  const response = await fetch('http://localhost:8000/tts', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ text, language }),
-  });
+    const finish = (success: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (activeResolve === finish) {
+        activeResolve = null;
+      }
+      resolve(success);
+    };
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => response.statusText);
-    throw new Error(`TTS request failed with status ${response.status}: ${errorText}`);
-  }
-
-  const blob = await response.blob();
-  const audioUrl = URL.createObjectURL(blob);
-  const audio = new Audio(audioUrl);
-  activeAudio = audio;
-
-  const cleanup = () => {
-    URL.revokeObjectURL(audioUrl);
-    if (activeAudio === audio) {
+    // Stop any currently playing audio and resolve its pending promise
+    if (activeAudio) {
+      try {
+        activeAudio.pause();
+        activeAudio.currentTime = 0;
+      } catch {
+        // Ignore pause errors
+      }
       activeAudio = null;
     }
-  };
+    if (activeResolve) {
+      activeResolve(false);
+      activeResolve = null;
+    }
 
-  audio.onended = cleanup;
-  audio.onerror = cleanup;
+    activeResolve = finish;
 
-  try {
-    await audio.play();
-  } catch (err) {
-    console.warn('Audio playback was interrupted or blocked by autoplay policy:', err);
-  }
+    (async () => {
+      let audioUrl = '';
+      try {
+        const response = await fetch('http://localhost:8000/tts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ text, language }),
+        });
 
-  return audio;
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => response.statusText);
+          console.warn(`TTS request failed with status ${response.status}: ${errorText}`);
+          finish(false);
+          return;
+        }
+
+        const blob = await response.blob();
+        if (typeof Audio === 'undefined') {
+          finish(false);
+          return;
+        }
+
+        audioUrl = typeof URL !== 'undefined' && URL.createObjectURL ? URL.createObjectURL(blob) : '';
+        const audio = new Audio(audioUrl);
+        activeAudio = audio;
+
+        const cleanup = () => {
+          if (audioUrl && typeof URL !== 'undefined' && URL.revokeObjectURL) {
+            try {
+              URL.revokeObjectURL(audioUrl);
+            } catch {
+              // Ignore revoke errors
+            }
+          }
+          if (activeAudio === audio) {
+            activeAudio = null;
+          }
+        };
+
+        audio.onended = () => {
+          cleanup();
+          finish(true);
+        };
+
+        audio.onerror = () => {
+          cleanup();
+          finish(false);
+        };
+
+        try {
+          await audio.play();
+        } catch (playErr) {
+          console.warn('Audio playback was prevented or failed:', playErr);
+          cleanup();
+          finish(false);
+        }
+      } catch (err) {
+        console.warn('TTS request error:', err);
+        if (audioUrl && typeof URL !== 'undefined' && URL.revokeObjectURL) {
+          try {
+            URL.revokeObjectURL(audioUrl);
+          } catch {
+            // Ignore revoke errors
+          }
+        }
+        finish(false);
+      }
+    })();
+  });
 }
 
 /**
@@ -76,6 +133,10 @@ export function stopSpeaking(): void {
       // Ignore pause errors
     }
     activeAudio = null;
+  }
+  if (activeResolve) {
+    activeResolve(false);
+    activeResolve = null;
   }
 }
 
