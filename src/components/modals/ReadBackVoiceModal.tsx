@@ -31,7 +31,12 @@ export const ReadBackVoiceModal: React.FC = () => {
     applyVoiceCorrection,
     lastCorrectedMessage,
     triggerDangerSign,
-    setCurrentScreen 
+    setCurrentScreen,
+    isListeningForCorrection,
+    correctionLiveTranscript,
+    stopVoiceCorrectionListening,
+    submitCorrection,
+    confirmConversationalReport,
   } = useApp();
 
   const [activeCorrectionField, setActiveCorrectionField] = useState<string | null>(null);
@@ -40,13 +45,13 @@ export const ReadBackVoiceModal: React.FC = () => {
 
   if (!isReadBackActive) return null;
 
-  const handleQuickCorrection = (field: 'weight' | 'name' | 'visitType' | 'vaccine' | 'nextDate', val: any) => {
+  const handleQuickCorrection = (field: 'bp' | 'weight' | 'name' | 'visitType' | 'vaccine' | 'nextDate', val: any) => {
     setIsSimulatingMicInput(true);
     setTimeout(() => {
       applyVoiceCorrection(field, val);
       setIsSimulatingMicInput(false);
       setActiveCorrectionField(null);
-    }, 400);
+    }, 200);
   };
 
   const handleCustomVoiceSubmit = (field: 'weight' | 'name' | 'visitType' | 'vaccine' | 'nextDate') => {
@@ -140,7 +145,28 @@ export const ReadBackVoiceModal: React.FC = () => {
               <span className="text-teal-700">{readBackState.toUpperCase()}</span>
             </div>
             <p className="text-sm font-semibold text-slate-900 leading-relaxed font-['Noto_Sans_Devanagari',sans-serif]">
-              "लाभार्थी <span className="text-teal-800 font-bold">{activeBeneficiary.name}</span>, भेंट <span className="text-teal-800 font-bold">{activeVisit.visitType}</span>, बीपी <span className="text-teal-800 font-bold">{activeVisit.vitals.systolic}/{activeVisit.vitals.diastolic}</span>, वजन <span className="text-teal-800 font-bold">{activeVisit.vitals.weight} kg</span>, पैरों में सूजन दर्ज, अगली भेंट <span className="text-teal-800 font-bold">{activeVisit.nextVisitDate}</span>।"
+              लाभार्थी{' '}
+              <span className="text-teal-800 font-bold">
+                {activeVisit.beneficiary?.name?.trim() || activeBeneficiary.name?.trim() || 'Name not provided'}
+              </span>
+              , भेंट{' '}
+              <span className="text-teal-800 font-bold">{activeVisit.visitType || 'Not provided'}</span>
+              , बीपी{' '}
+              <span className="text-teal-800 font-bold">
+                {activeVisit.vitals.systolic != null && activeVisit.vitals.diastolic != null
+                  ? `${activeVisit.vitals.systolic}/${activeVisit.vitals.diastolic}`
+                  : 'Not provided'}
+              </span>
+              , वजन{' '}
+              <span className="text-teal-800 font-bold">
+                {activeVisit.vitals.weight != null ? `${activeVisit.vitals.weight} kg` : 'Not provided'}
+              </span>
+              , टीकाकरण{' '}
+              <span className="text-teal-800 font-bold">
+                {activeVisit.vaccinationStatus || 'Not provided'}
+              </span>
+              , अगली भेंट{' '}
+              <span className="text-teal-800 font-bold">{activeVisit.nextVisitDate || 'Not provided'}</span>।
             </p>
           </div>
 
@@ -180,16 +206,26 @@ export const ReadBackVoiceModal: React.FC = () => {
             )}
 
             <button
-              onClick={interruptReadBackForCorrection}
+              onClick={() => {
+                if (isListeningForCorrection) {
+                  stopVoiceCorrectionListening();
+                } else {
+                  interruptReadBackForCorrection();
+                }
+              }}
               className={`flex items-center space-x-1.5 px-4 py-2 rounded-xl font-bold transition shadow-sm ${
-                readBackState === 'listening'
+                readBackState === 'listening' || isListeningForCorrection
                   ? 'bg-red-600 text-white animate-pulse'
                   : 'bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100'
               }`}
             >
               <Mic className="w-4 h-4" />
               <span>
-                {readBackState === 'listening' ? 'Listening... Speak now' : 'Interrupt to Correct (बोलकर रोकें)'}
+                {isListeningForCorrection
+                  ? 'Stop & Apply Spoken Correction'
+                  : readBackState === 'listening'
+                  ? 'Listening... Speak now'
+                  : 'Interrupt to Correct (बोलकर रोकें)'}
               </span>
             </button>
 
@@ -202,16 +238,64 @@ export const ReadBackVoiceModal: React.FC = () => {
             </button>
           </div>
 
+          {/* Live STT preview & natural conversational correction input */}
+          {isListeningForCorrection && (
+            <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 font-medium">
+              {correctionLiveTranscript
+                ? `Hearing: "${correctionLiveTranscript}"`
+                : 'Listening via Gnani STT... e.g. "Nahi, BP 110/90 hai" or "Haan, correct hai"'}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <input
+              value={customInputVal}
+              onChange={(e) => setCustomInputVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && customInputVal.trim()) {
+                  const txt = customInputVal;
+                  setCustomInputVal('');
+                  void submitCorrection(txt, 'text');
+                }
+              }}
+              placeholder='Speak or type: "Nahi, BP 110/90 hai" / "Weight 58 kg hai"'
+              className="flex-1 text-xs border border-slate-200 rounded-xl px-3 py-2"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (!customInputVal.trim()) return;
+                const txt = customInputVal;
+                setCustomInputVal('');
+                void submitCorrection(txt, 'text');
+              }}
+              className="text-xs font-bold bg-teal-700 hover:bg-teal-800 text-white px-3.5 py-2 rounded-xl"
+            >
+              Send
+            </button>
+          </div>
+
           {/* Micro-Interaction: Verbal Correction Cues */}
           <div className="text-left bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                Simulate Field Spoken Corrections (5 Target Fields):
+                Simulate Field Spoken Corrections (6 Target Fields):
               </span>
               <span className="text-[10px] text-slate-400">Atomic field updates</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {/* 0. BP correction */}
+              <button
+                onClick={() => handleQuickCorrection('bp', '110/90')}
+                className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-teal-50 hover:border-teal-300 text-left transition space-y-0.5"
+              >
+                <div className="flex items-center justify-between font-bold text-slate-800">
+                  <span>0. Correct BP (बीपी)</span>
+                  <span className="text-teal-700 font-mono text-[10px]">110/90</span>
+                </div>
+                <p className="text-[11px] text-slate-500 italic">"नहीं, बीपी 110/90 है"</p>
+              </button>
               {/* 1. Weight correction */}
               <button
                 onClick={() => handleQuickCorrection('weight', 54)}
@@ -226,14 +310,14 @@ export const ReadBackVoiceModal: React.FC = () => {
 
               {/* 2. Beneficiary Name correction */}
               <button
-                onClick={() => handleQuickCorrection('name', 'Pooja Kumari')}
+                onClick={() => handleQuickCorrection('name', 'Sunita Devi')}
                 className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-teal-50 hover:border-teal-300 text-left transition space-y-0.5"
               >
                 <div className="flex items-center justify-between font-bold text-slate-800">
                   <span>2. Correct Name (नाम)</span>
-                  <span className="text-teal-700 font-mono text-[10px]">Pooja Kumari</span>
+                  <span className="text-teal-700 font-mono text-[10px]">Sunita Devi</span>
                 </div>
-                <p className="text-[11px] text-slate-500 italic">"लाभार्थी का नाम पूजा कुमारी है"</p>
+                <p className="text-[11px] text-slate-500 italic">"लाभार्थी का नाम सुनीता देवी है"</p>
               </button>
 
               {/* 3. Visit Type correction */}
@@ -248,16 +332,16 @@ export const ReadBackVoiceModal: React.FC = () => {
                 <p className="text-[11px] text-slate-500 italic">"यह चौथा एएनसी चेकअप है"</p>
               </button>
 
-              {/* 4. Vaccination TT Booster */}
+              {/* 4. Vaccination status */}
               <button
-                onClick={() => handleQuickCorrection('vaccine', true)}
+                onClick={() => handleQuickCorrection('vaccine', 'TT injection administered')}
                 className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-teal-50 hover:border-teal-300 text-left transition space-y-0.5"
               >
                 <div className="flex items-center justify-between font-bold text-slate-800">
                   <span>4. Correct Vaccine (टीका)</span>
-                  <span className="text-teal-700 font-mono text-[10px]">TT Booster</span>
+                  <span className="text-teal-700 font-mono text-[10px]">TT Injection</span>
                 </div>
-                <p className="text-[11px] text-slate-500 italic">"टीटी बूस्टर टीका आज लगाया गया"</p>
+                <p className="text-[11px] text-slate-500 italic">"टीटी इंजेक्शन आज लगाया गया"</p>
               </button>
 
               {/* 5. Next Visit Date */}
@@ -337,7 +421,8 @@ export const ReadBackVoiceModal: React.FC = () => {
               </button>
 
               <button
-                onClick={() => {
+                onClick={async () => {
+                  await confirmConversationalReport();
                   stopReadBack();
                   setCurrentScreen('clinical-alerts');
                 }}

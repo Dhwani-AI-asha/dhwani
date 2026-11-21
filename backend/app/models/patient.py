@@ -23,7 +23,7 @@ class Patient(Base):
     # Unique human-readable patient identifier (e.g., PAT-2026-0001)
     patient_id = Column(String(32), unique=True, index=True, nullable=False)
     name = Column(String(120), nullable=False, index=True)
-    age = Column(Integer, nullable=False)
+    age = Column(Integer, nullable=True)
     gender = Column(String(20), nullable=True)
     contact_number = Column(String(20), nullable=True, index=True)
     address = Column(String(255), nullable=True)

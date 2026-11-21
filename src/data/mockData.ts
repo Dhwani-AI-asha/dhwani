@@ -86,6 +86,7 @@ export const predefinedDangerSigns: DangerSignAlert[] = [
 export const mockBeneficiaries: Beneficiary[] = [
   {
     id: 'b-pooja',
+    patientId: 'PAT-2026-0002',
     name: 'Pooja Devi',
     spouseName: 'Manoj Kumar',
     age: 24,
@@ -105,6 +106,7 @@ export const mockBeneficiaries: Beneficiary[] = [
   },
   {
     id: 'b-meena',
+    patientId: 'PAT-2026-0003',
     name: 'Meena Kumari',
     spouseName: 'Rajesh',
     age: 28,
@@ -122,6 +124,7 @@ export const mockBeneficiaries: Beneficiary[] = [
   },
   {
     id: 'b-aarav',
+    patientId: 'PAT-2026-0004',
     name: 'Aarav Sharma',
     spouseName: 'Sunita (Mother)',
     age: 1.5,
@@ -135,6 +138,7 @@ export const mockBeneficiaries: Beneficiary[] = [
   },
   {
     id: 'b-savitri',
+    patientId: 'PAT-2026-0005',
     name: 'Savitri Devi',
     age: 58,
     village: 'Main Road, Rampur',
@@ -148,6 +152,7 @@ export const mockBeneficiaries: Beneficiary[] = [
   },
   {
     id: 'b-geeta',
+    patientId: 'PAT-2026-0006',
     name: 'Geeta Patel',
     spouseName: 'Vikram',
     age: 21,
@@ -167,8 +172,8 @@ export const initialActiveVisit: StructuredVisitData = {
   nextVisitDate: '24 Nov 2024',
   audioDurationText: '01:42',
   languageDetected: 'Hindi (हिन्दी) with English Clinical Terms',
-  confidenceScore: 98.4,
-  originalTranscript: 'पूजा देवी, उम्र 24 वर्ष, गर्भावस्था का 32वां सप्ताह (3rd trimester)। आज गृह भेंट में बीपी मापा गया जो 130/85 mmHg आया। नाड़ी 78 प्रति मिनट। लाभार्थी ने बताया कि पिछले 3 दिनों से दोनों पैरों में सूजन (bilateral pedal edema) आ रही है और कल शाम से हल्का सिरदर्द है। भ्रूण की हलचल (fetal movement) सामान्य है। आयरन और फोलिक एसिड की गोलियां रोज ले रही हैं, अभी 15 गोलियां बची हैं। टिटनेस का दूसरा टीका (TT-2) पिछले महीने लग चुका है। वजन 56 किलो है, पिछले महीने से 2 किलो बढ़ा है।',
+  confidenceScore: 0,
+  originalTranscript: '',
   vitals: {
     systolic: 130,
     diastolic: 85,

@@ -437,7 +437,11 @@ def detect_transcript_language(
 # Narration Generators by Language
 # ============================================================================
 
-def _narrate_english(report: MedicalReportOutput, mode: NarrationMode) -> str:
+def _narrate_english(
+    report: MedicalReportOutput,
+    mode: NarrationMode,
+    grounded_extras: Optional[Dict[str, Any]] = None,
+) -> str:
     """Generate professional medical report narration in English."""
     lines: List[str] = []
 
@@ -475,12 +479,22 @@ def _narrate_english(report: MedicalReportOutput, mode: NarrationMode) -> str:
 
     # Demographics
     lines.append("PATIENT DETAILS:")
-    p_name = report.patient_name if report.patient_name else "Not specified in transcript"
-    p_age = report.patient_age if report.patient_age else "Not specified in transcript"
-    p_gender = report.patient_gender if report.patient_gender else "Not specified in transcript"
+    p_name = report.patient_name if report.patient_name else "Name not provided"
+    p_age = report.patient_age if report.patient_age else "Not provided"
+    p_gender = report.patient_gender if report.patient_gender else "Not provided"
     lines.append(f"• Name: {p_name}")
     lines.append(f"• Age: {p_age}")
     lines.append(f"• Gender: {p_gender}")
+
+    if grounded_extras is not None:
+        v_type = grounded_extras.get("visit_type") or "Not provided"
+        next_v = grounded_extras.get("next_visit_date") or "Not provided"
+        vac_status = grounded_extras.get("vaccination_status") or "Not provided"
+        booster_st = grounded_extras.get("booster_status") or "Not provided"
+        lines.append(f"• Visit Type: {v_type}")
+        lines.append(f"• Vaccination: {vac_status}")
+        lines.append(f"• Booster Status: {booster_st}")
+        lines.append(f"• Next Visit: {next_v}")
 
     # Chief complaint
     cc = report.chief_complaint if report.chief_complaint else "Not explicitly stated"
@@ -533,7 +547,11 @@ def _narrate_english(report: MedicalReportOutput, mode: NarrationMode) -> str:
     return "\n".join(lines)
 
 
-def _narrate_hindi(report: MedicalReportOutput, mode: NarrationMode) -> str:
+def _narrate_hindi(
+    report: MedicalReportOutput,
+    mode: NarrationMode,
+    grounded_extras: Optional[Dict[str, Any]] = None,
+) -> str:
     """Generate professional medical report narration in Hindi (Devanagari script)."""
     lines: List[str] = []
 
@@ -571,12 +589,22 @@ def _narrate_hindi(report: MedicalReportOutput, mode: NarrationMode) -> str:
 
     # Demographics
     lines.append("मरीज का विवरण:")
-    p_name = report.patient_name if report.patient_name else "परामर्श में उल्लेख नहीं"
-    p_age = report.patient_age if report.patient_age else "परामर्श में उल्लेख नहीं"
-    p_gender = report.patient_gender if report.patient_gender else "परामर्श में उल्लेख नहीं"
+    p_name = report.patient_name if report.patient_name else "Name not provided (उल्लेख नहीं)"
+    p_age = report.patient_age if report.patient_age else "Not provided (उल्लेख नहीं)"
+    p_gender = report.patient_gender if report.patient_gender else "Not provided (उल्लेख नहीं)"
     lines.append(f"• नाम: {p_name}")
     lines.append(f"• उम्र: {p_age}")
     lines.append(f"• लिंग: {p_gender}")
+
+    if grounded_extras is not None:
+        v_type = grounded_extras.get("visit_type") or "Not provided (उल्लेख नहीं)"
+        next_v = grounded_extras.get("next_visit_date") or "Not provided (उल्लेख नहीं)"
+        vac_status = grounded_extras.get("vaccination_status") or "Not provided (उल्लेख नहीं)"
+        booster_st = grounded_extras.get("booster_status") or "Not provided (उल्लेख नहीं)"
+        lines.append(f"• विजिट प्रकार: {v_type}")
+        lines.append(f"• टीकाकरण: {vac_status}")
+        lines.append(f"• बूस्टर स्थिति: {booster_st}")
+        lines.append(f"• अगली विजिट: {next_v}")
 
     # Chief complaint
     cc = report.chief_complaint if report.chief_complaint else "स्पष्ट रूप से उल्लिखित नहीं"
@@ -629,7 +657,11 @@ def _narrate_hindi(report: MedicalReportOutput, mode: NarrationMode) -> str:
     return "\n".join(lines)
 
 
-def _narrate_hinglish(report: MedicalReportOutput, mode: NarrationMode) -> str:
+def _narrate_hinglish(
+    report: MedicalReportOutput,
+    mode: NarrationMode,
+    grounded_extras: Optional[Dict[str, Any]] = None,
+) -> str:
     """Generate professional medical report narration in natural Hinglish."""
     lines: List[str] = []
 
@@ -667,12 +699,22 @@ def _narrate_hinglish(report: MedicalReportOutput, mode: NarrationMode) -> str:
 
     # Demographics
     lines.append("PATIENT DETAILS:")
-    p_name = report.patient_name if report.patient_name else "Transcript me mention nahi hai"
-    p_age = report.patient_age if report.patient_age else "Transcript me mention nahi hai"
-    p_gender = report.patient_gender if report.patient_gender else "Transcript me mention nahi hai"
+    p_name = report.patient_name if report.patient_name else "Name not provided"
+    p_age = report.patient_age if report.patient_age else "Not provided"
+    p_gender = report.patient_gender if report.patient_gender else "Not provided"
     lines.append(f"• Name: {p_name}")
     lines.append(f"• Age: {p_age}")
     lines.append(f"• Gender: {p_gender}")
+
+    if grounded_extras is not None:
+        v_type = grounded_extras.get("visit_type") or "Not provided"
+        next_v = grounded_extras.get("next_visit_date") or "Not provided"
+        vac_status = grounded_extras.get("vaccination_status") or "Not provided"
+        booster_st = grounded_extras.get("booster_status") or "Not provided"
+        lines.append(f"• Visit Type: {v_type}")
+        lines.append(f"• Vaccination: {vac_status}")
+        lines.append(f"• Booster Status: {booster_st}")
+        lines.append(f"• Next Visit: {next_v}")
 
     # Chief complaint
     cc = report.chief_complaint if report.chief_complaint else "Explicitly mention nahi kiya gaya"
@@ -734,7 +776,8 @@ def generate_narration_result(
     transcript: Optional[str] = None,
     mode: Union[NarrationMode, str] = NarrationMode.FULL_REPORT,
     language: Optional[Union[NarrationLanguage, str]] = None,
-    fallback_language: Union[NarrationLanguage, str] = NarrationLanguage.ENGLISH
+    fallback_language: Union[NarrationLanguage, str] = NarrationLanguage.ENGLISH,
+    grounded_extras: Optional[Dict[str, Any]] = None,
 ) -> NarrationResult:
     """
     Generate language-matched medical narration with rich metadata.
@@ -802,11 +845,11 @@ def generate_narration_result(
 
     # Generate narration based on chosen language
     if chosen_language == NarrationLanguage.HINDI.value:
-        narration_text = _narrate_hindi(report, norm_mode)
+        narration_text = _narrate_hindi(report, norm_mode, grounded_extras=grounded_extras)
     elif chosen_language == NarrationLanguage.HINGLISH.value:
-        narration_text = _narrate_hinglish(report, norm_mode)
+        narration_text = _narrate_hinglish(report, norm_mode, grounded_extras=grounded_extras)
     else:
-        narration_text = _narrate_english(report, norm_mode)
+        narration_text = _narrate_english(report, norm_mode, grounded_extras=grounded_extras)
 
     return NarrationResult(
         narration_text=narration_text,

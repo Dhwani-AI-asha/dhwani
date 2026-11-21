@@ -28,7 +28,8 @@ export const NewVisitRecording: React.FC = () => {
     cancelRecording,
     liveTranscript,
     voiceStatus,
-    voiceError
+    voiceError,
+    emergencyConfirmation
   } = useApp();
 
   // Format time mm:ss
@@ -71,25 +72,41 @@ export const NewVisitRecording: React.FC = () => {
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-bold text-slate-900">
-                {activeBeneficiary.name}
+                {activeBeneficiary.name?.trim()
+                  ? activeBeneficiary.name
+                  : 'No pre-selected beneficiary (will extract name from speech)'}
               </h2>
               {activeBeneficiary.spouseName && (
                 <span className="text-xs text-slate-500">
                   (W/o {activeBeneficiary.spouseName})
                 </span>
               )}
-              <span className="bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-0.5 rounded-full text-xs font-semibold">
-                {activeBeneficiary.stage}
-              </span>
+              {activeBeneficiary.stage && (
+                <span className="bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-0.5 rounded-full text-xs font-semibold">
+                  {activeBeneficiary.stage}
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-              <span>{activeBeneficiary.age} Yrs</span>
-              <span>•</span>
-              <span>{activeBeneficiary.village}, {activeBeneficiary.gali || 'Ward 4'}</span>
-              <span>•</span>
-              <span className="font-medium text-slate-700">RCH ID: {activeBeneficiary.rchId}</span>
-              <span>•</span>
-              <span>{activeBeneficiary.subCenter}</span>
+              <span>{activeBeneficiary.age != null ? `${activeBeneficiary.age} Yrs` : 'Age: Not provided'}</span>
+              {activeBeneficiary.village && (
+                <>
+                  <span>•</span>
+                  <span>{activeBeneficiary.village}{activeBeneficiary.gali ? `, ${activeBeneficiary.gali}` : ''}</span>
+                </>
+              )}
+              {activeBeneficiary.rchId && (
+                <>
+                  <span>•</span>
+                  <span className="font-medium text-slate-700">RCH ID: {activeBeneficiary.rchId}</span>
+                </>
+              )}
+              {activeBeneficiary.subCenter && (
+                <>
+                  <span>•</span>
+                  <span>{activeBeneficiary.subCenter}</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -203,6 +220,15 @@ export const NewVisitRecording: React.FC = () => {
             </p>
           )}
         </div>
+
+        {emergencyConfirmation &&
+          (emergencyConfirmation.phase === 'speaking_alert' ||
+            emergencyConfirmation.phase === 'listening' ||
+            emergencyConfirmation.phase === 'retrying') && (
+            <div className="max-w-2xl mx-auto bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-xs text-red-900 font-semibold">
+              Emergency Voice Confirmation active ({emergencyConfirmation.detectedSign}) — Normal patient transcription is paused and isolated.
+            </div>
+          )}
 
         {/* Bottom Control Buttons */}
         <div className="flex flex-wrap items-center justify-center gap-4 pt-2">

@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { Search, UserPlus, Phone, Mic, FileText, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Search, UserPlus, Mic, FileText } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { mockBeneficiaries } from '../../data/mockData';
 
 export const Beneficiaries: React.FC = () => {
-  const { setActiveBeneficiary, startRecording, setCurrentScreen } = useApp();
+  const { beneficiaries, setActiveBeneficiary, startRecording, setCurrentScreen } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'anc' | 'pnc' | 'immunization'>('all');
 
-  const filtered = mockBeneficiaries.filter(b => {
+  const filtered = beneficiaries.filter(b => {
     const matches = b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    b.rchId.toLowerCase().includes(searchQuery.toLowerCase());
+                    b.rchId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    (b.patientId || '').toLowerCase().includes(searchQuery.toLowerCase());
     if (!matches) return false;
     if (filter === 'anc') return b.stage.includes('ANC');
     if (filter === 'pnc') return b.stage.includes('PNC');
@@ -67,7 +67,7 @@ export const Beneficiaries: React.FC = () => {
               filter === 'all' ? 'bg-teal-700 text-white shadow-2xs' : 'bg-slate-100 text-slate-600'
             }`}
           >
-            All ({mockBeneficiaries.length})
+            All ({beneficiaries.length})
           </button>
           <button
             onClick={() => setFilter('anc')}

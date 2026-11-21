@@ -25,7 +25,10 @@ export const SyncCentre: React.FC = () => {
     storedVisits, 
     syncCounts, 
     isOnline, 
-    startRecording 
+    startRecording,
+    attemptAutoSync,
+    isSyncing,
+    syncError
   } = useApp();
 
   const [filter, setFilter] = useState<'all' | 'attention' | 'pending' | 'failed' | 'syncing' | 'synced'>('all');
@@ -126,8 +129,8 @@ export const SyncCentre: React.FC = () => {
           </p>
         </div>
 
-        {/* Network status chip */}
-        <div className="flex items-center space-x-2 text-xs font-semibold self-start md:self-auto">
+        {/* Network status chip & Sync Button */}
+        <div className="flex flex-wrap items-center gap-2.5 text-xs font-semibold self-start md:self-auto">
           {isOnline ? (
             <div className="flex items-center space-x-2 bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-xl shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -140,6 +143,17 @@ export const SyncCentre: React.FC = () => {
               <WifiOff className="w-3.5 h-3.5 text-amber-700" />
               <span>Offline Mode (IndexedDB Active)</span>
             </div>
+          )}
+
+          {isOnline && (
+            <button
+              onClick={() => attemptAutoSync()}
+              disabled={isSyncing}
+              className="flex items-center space-x-1.5 bg-teal-700 hover:bg-teal-800 disabled:opacity-50 text-white px-3.5 py-1.5 rounded-xl shadow-2xs transition active:scale-95"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Syncing...' : 'Sync Pending Records'}</span>
+            </button>
           )}
         </div>
       </div>
@@ -350,16 +364,18 @@ export const SyncCentre: React.FC = () => {
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-base font-bold text-slate-900">
-                        {beneficiary?.name || 'Beneficiary'}
+                        {beneficiary?.name?.trim() || 'Name not provided'}
                       </h3>
                       {beneficiary?.spouseName && (
                         <span className="text-xs text-slate-500">
                           (W/o {beneficiary.spouseName})
                         </span>
                       )}
-                      <span className="bg-teal-50 text-teal-800 border border-teal-200 text-[11px] font-semibold px-2 py-0.5 rounded-full">
-                        {beneficiary?.stage || 'ANC'}
-                      </span>
+                      {beneficiary?.stage && (
+                        <span className="bg-teal-50 text-teal-800 border border-teal-200 text-[11px] font-semibold px-2 py-0.5 rounded-full">
+                          {beneficiary.stage}
+                        </span>
+                      )}
                       {isEscalated && (
                         <span className="bg-red-50 text-red-700 border border-red-200 text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center space-x-1">
                           <ShieldAlert className="w-3 h-3 text-red-600" />
@@ -369,11 +385,17 @@ export const SyncCentre: React.FC = () => {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                      <span>RCH ID: {beneficiary?.rchId || 'N/A'}</span>
+                      <span>RCH ID: {beneficiary?.rchId || 'Not provided'}</span>
                       <span>•</span>
-                      <span>{beneficiary?.village || 'Rampur'}, {beneficiary?.gali || 'Ward 4'}</span>
+                      <span>
+                        {beneficiary?.village
+                          ? `${beneficiary.village}${beneficiary.gali ? `, ${beneficiary.gali}` : ''}`
+                          : 'Location: Not provided'}
+                      </span>
                       <span>•</span>
-                      <span className="font-medium text-slate-700">{record.visitData?.visitType || 'ANC Follow-up'}</span>
+                      <span className="font-medium text-slate-700">
+                        Visit type: {record.visitData?.visitType || 'Not provided'}
+                      </span>
                     </div>
                   </div>
 
@@ -393,17 +415,20 @@ export const SyncCentre: React.FC = () => {
                     <div className="flex items-center space-x-1.5">
                       <HeartPulse className="w-3.5 h-3.5 text-teal-600" />
                       <span>
-                        BP: <strong>{vitals?.systolic || 0}/{vitals?.diastolic || 0} mmHg</strong>
+                        BP:{' '}
+                        <strong>
+                          {vitals?.systolic != null && vitals?.diastolic != null
+                            ? `${vitals.systolic}/${vitals.diastolic} mmHg`
+                            : 'Not provided'}
+                        </strong>
                       </span>
                     </div>
                     <div>
-                      Weight: <strong>{vitals?.weight || 0} kg</strong>
+                      Weight: <strong>{vitals?.weight != null ? `${vitals.weight} kg` : 'Not provided'}</strong>
                     </div>
-                    {vitals?.pulseRate ? (
-                      <div>
-                        Pulse: <strong>{vitals.pulseRate} bpm</strong>
-                      </div>
-                    ) : null}
+                    <div>
+                      Pulse: <strong>{vitals?.pulseRate != null ? `${vitals.pulseRate} bpm` : 'Not provided'}</strong>
+                    </div>
                   </div>
 
                   <div className="text-[11px] text-slate-500">
@@ -443,19 +468,26 @@ export const SyncCentre: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="p-2.5 bg-slate-50 rounded-lg">
                         <span className="font-bold text-slate-800 block mb-1">Symptoms Recorded:</span>
-                        <ul className="list-disc list-inside space-y-0.5 text-slate-600">
-                          <li>Pedal Edema: {record.visitData?.symptoms?.pedalEdema?.present ? `Yes (${record.visitData.symptoms.pedalEdema.grading})` : 'Absent'}</li>
-                          <li>Headache: {record.visitData?.symptoms?.headache?.present ? `Yes (${record.visitData.symptoms.headache.severity})` : 'None'}</li>
-                          <li>Fetal Movement: {record.visitData?.symptoms?.fetalMovement?.status || 'Normal'}</li>
-                        </ul>
+                        {record.visitData?.extractedSymptoms && record.visitData.extractedSymptoms.length > 0 ? (
+                          <ul className="list-disc list-inside space-y-0.5 text-slate-600">
+                            {record.visitData.extractedSymptoms.map((sym, idx) => (
+                              <li key={`${sym.name}-${idx}`}>
+                                {sym.name}
+                                {sym.duration ? ` (${sym.duration})` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-slate-500">Not provided</span>
+                        )}
                       </div>
 
                       <div className="p-2.5 bg-slate-50 rounded-lg">
-                        <span className="font-bold text-slate-800 block mb-1">Medications & Lab:</span>
+                        <span className="font-bold text-slate-800 block mb-1">Vaccination & Follow-up:</span>
                         <ul className="list-disc list-inside space-y-0.5 text-slate-600">
-                          <li>IFA Tablets: {record.visitData?.medications?.ifaTablets?.remainingTabs || 0} tabs remaining</li>
-                          <li>Calcium: {record.visitData?.medications?.calciumTablets?.status || 'Sufficient'}</li>
-                          <li>TT Booster: {record.visitData?.immunizationLab?.ttBooster?.administered ? 'Administered' : 'Pending'}</li>
+                          <li>Vaccination: {record.visitData?.vaccinationStatus || 'Not provided'}</li>
+                          <li>Booster Status: {record.visitData?.boosterStatus || 'Not provided'}</li>
+                          <li>Next Visit: {record.visitData?.nextVisitDate || 'Not provided'}</li>
                         </ul>
                       </div>
                     </div>

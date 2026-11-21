@@ -1,44 +1,55 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Play, 
-  Pause, 
-  RotateCcw, 
-  Volume2, 
   Sparkles, 
   AlertTriangle, 
   CheckCircle2, 
   ArrowRight, 
   FileEdit,
-  Radio,
-  VolumeX
+  Mic,
+  Square,
+  Volume2,
+  History
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { saveVisit } from '../../lib/patientApi';
 
 export const ReviewTranscript: React.FC = () => {
   const { 
     activeBeneficiary, 
+    isBeneficiarySelected,
+    confirmPatientIdentity,
+    setIsBeneficiaryModalOpen,
     activeVisit,
     setCurrentScreen, 
     startRecording,
-    isPlayingAudio,
-    audioCurrentTime,
-    togglePlayAudio,
-    seekAudio,
     reportResult,
     reportError,
+    reportErrorMessage,
     isReportLoading,
     replayReport,
-    submitCorrection
+    submitCorrection,
+    confirmConversationalReport,
+    conversationLog,
+    isListeningForCorrection,
+    correctionLiveTranscript,
+    isReportConfirmed,
+    startVoiceCorrectionListening,
+    stopVoiceCorrectionListening,
+    persistCurrentVisitToBackend,
   } = useApp();
 
   const [isEditingInline, setIsEditingInline] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState<'1.0x' | '1.2x' | '1.5x'>('1.0x');
-  const [isMuted, setIsMuted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [correctionText, setCorrectionText] = useState('');
+  const [identityInput, setIdentityInput] = useState('');
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const navTimeoutRef = useRef<any>(null);
+
+  const displayName = activeVisit.beneficiary?.name?.trim() || activeBeneficiary.name?.trim() || '';
+  const hasIdentityIssue =
+    !displayName ||
+    activeVisit.identityStatus === 'missing' ||
+    activeVisit.identityStatus === 'ambiguous' ||
+    activeVisit.identityStatus === 'mismatch';
 
   useEffect(() => {
     return () => {
@@ -49,12 +60,33 @@ export const ReviewTranscript: React.FC = () => {
   }, []);
 
   const handleConfirmAndSave = async () => {
+    if (hasIdentityIssue) {
+      setStatusMessage({
+        type: 'error',
+        text:
+          activeVisit.identityStatus === 'mismatch'
+            ? activeVisit.identityMismatchDetail || 'Patient name in transcript does not match the selected beneficiary. Resolve identity below before continuing.'
+            : 'Patient name is not confirmed. Please enter/confirm the exact patient name or select a beneficiary before continuing.',
+      });
+      return;
+    }
     setIsSaving(true);
     setStatusMessage(null);
     try {
-      const transcript = activeVisit.originalTranscript || '';
-      await saveVisit('PAT-2026-0001', transcript);
-      setStatusMessage({ type: 'success', text: 'Visit saved successfully.' });
+      const result = await persistCurrentVisitToBackend(activeVisit, reportResult?.report ?? activeVisit.structuredReport);
+      if (!result.ok) {
+        setStatusMessage({
+          type: 'error',
+          text: result.error || 'Failed to save visit to backend. Your visit data has been preserved locally.',
+        });
+        return;
+      }
+      setStatusMessage({
+        type: 'success',
+        text: result.visitId
+          ? `Visit saved successfully (${result.visitId}).`
+          : 'Visit saved successfully.',
+      });
       navTimeoutRef.current = setTimeout(() => {
         setCurrentScreen('verify-record');
       }, 400);
@@ -64,18 +96,6 @@ export const ReviewTranscript: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const formatAudioTime = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const handleSpeedCycle = () => {
-    if (playbackSpeed === '1.0x') setPlaybackSpeed('1.2x');
-    else if (playbackSpeed === '1.2x') setPlaybackSpeed('1.5x');
-    else setPlaybackSpeed('1.0x');
   };
 
   return (
@@ -96,7 +116,7 @@ export const ReviewTranscript: React.FC = () => {
 
         <div className="flex items-center space-x-1.5 bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold self-start sm:self-auto border border-slate-200">
           <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-          <span>On-Device Whisper ASR Ready</span>
+          <span>Gnani STT</span>
         </div>
       </div>
 
@@ -110,16 +130,34 @@ export const ReviewTranscript: React.FC = () => {
           />
           <div>
             <div className="flex items-center space-x-2">
-              <h3 className="text-sm font-bold text-slate-900">{activeBeneficiary.name}</h3>
-              <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[11px] font-semibold">
-                {activeBeneficiary.stage.split('•')[0]}
-              </span>
-              <span className="text-xs text-slate-400">RCH ID: {activeBeneficiary.rchId}</span>
+              <h3 className="text-sm font-bold text-slate-900">
+                {displayName || 'Name not provided'}
+              </h3>
+              {isBeneficiarySelected && activeBeneficiary.stage && (
+                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[11px] font-semibold">
+                  {activeBeneficiary.stage.split('•')[0]}
+                </span>
+              )}
+              {activeBeneficiary.rchId && (
+                <span className="text-xs text-slate-400">RCH ID: {activeBeneficiary.rchId}</span>
+              )}
+              {activeBeneficiary.patientId && (
+                <span className="text-[11px] font-mono text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
+                  {activeBeneficiary.patientId}
+                </span>
+              )}
             </div>
             <div className="flex items-center space-x-3 text-xs text-slate-500 mt-0.5">
-              <span>Recorded 2 minutes ago</span>
-              <span>•</span>
-              <span className="font-medium text-slate-700">Audio Duration: 1m 42s</span>
+              {activeVisit.audioDurationText && (
+                <span className="font-medium text-slate-700">Duration: {activeVisit.audioDurationText}</span>
+              )}
+              <span>
+                Identity source: {activeVisit.patientNameSource === 'selected_beneficiary'
+                  ? 'Selected beneficiary'
+                  : activeVisit.patientNameSource === 'transcript' || activeVisit.patientNameSource === 'confirmed'
+                  ? 'From transcript / confirmed'
+                  : 'Not provided'}
+              </span>
             </div>
           </div>
         </div>
@@ -127,11 +165,7 @@ export const ReviewTranscript: React.FC = () => {
         <div className="flex items-center space-x-4 shrink-0 text-xs">
           <div className="text-right">
             <span className="text-slate-400 text-[11px] block">Visit Type</span>
-            <span className="font-semibold text-slate-800">Home ANC Follow-up</span>
-          </div>
-          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-1.5 rounded-xl font-semibold flex items-center space-x-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
-            <span>High Priority Alert: BP 130/85 + Edema</span>
+            <span className="font-semibold text-slate-800">{activeVisit.visitType || 'Not provided'}</span>
           </div>
         </div>
       </div>
@@ -142,75 +176,16 @@ export const ReviewTranscript: React.FC = () => {
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
           <div>
             <div className="flex items-center space-x-2 font-bold text-emerald-900">
-              <span>Detected Language: Hindi (हिन्दी) with English Clinical Terms</span>
-              <span className="bg-emerald-200 text-emerald-800 text-[10px] px-2 py-0.2 rounded-full">
-                Confidence: 98%
+              <span>
+                {activeVisit.languageDetected
+                  ? `Detected Language: ${activeVisit.languageDetected}`
+                  : 'Language detection pending'}
               </span>
             </div>
             <p className="text-emerald-700 mt-0.5 text-[11px]">
-              Automatic language detection verified. Mixed Hindi/English colloquial terms recognized accurately.
+              Automatic language detection by Gnani STT. Review the transcript below before proceeding.
             </p>
           </div>
-        </div>
-
-        <div className="text-emerald-800 font-semibold text-[11px] bg-emerald-100/70 px-3 py-1 rounded-lg shrink-0">
-          Acoustic Dialect: Bhojpuri-Hindi Mix
-        </div>
-      </div>
-
-      {/* Audio Player Card */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-          <div className="flex items-center space-x-2">
-            <Radio className="w-4 h-4 text-teal-600" />
-            <span>Original Audio Recording</span>
-          </div>
-          <span className="text-[11px] text-slate-400 font-normal">
-            Master WAV • 48 kHz High Fidelity
-          </span>
-        </div>
-
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={togglePlayAudio}
-            className="w-11 h-11 rounded-full bg-teal-700 hover:bg-teal-800 text-white flex items-center justify-center shrink-0 shadow-md shadow-teal-900/10 transition active:scale-95"
-          >
-            {isPlayingAudio ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
-          </button>
-
-          <span className="text-xs font-mono font-semibold text-slate-700 w-12">
-            {formatAudioTime(audioCurrentTime)}
-          </span>
-
-          {/* Interactive Scrubber & Waveform */}
-          <div className="flex-1 relative flex items-center">
-            <input
-              type="range"
-              min="0"
-              max="102"
-              value={audioCurrentTime}
-              onChange={(e) => seekAudio(Number(e.target.value))}
-              className="w-full accent-teal-700 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
-            />
-          </div>
-
-          <span className="text-xs font-mono text-slate-400 w-12 text-right">
-            01:42
-          </span>
-
-          <button
-            onClick={handleSpeedCycle}
-            className="text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition"
-          >
-            {playbackSpeed}
-          </button>
-
-          <button
-            onClick={() => setIsMuted(prev => !prev)}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded transition"
-          >
-            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          </button>
         </div>
       </div>
 
@@ -258,48 +233,89 @@ export const ReviewTranscript: React.FC = () => {
         </div>
 
         <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-          <span>Character count: 482 words • All 6 Medical Entities Synced</span>
+          <span>
+            {activeVisit.originalTranscript
+              ? `${activeVisit.originalTranscript.trim().split(/\s+/).filter(Boolean).length} words`
+              : 'No transcript recorded'}
+          </span>
           <div className="flex items-center space-x-3">
             <button className="hover:text-slate-800 font-medium transition">
               Undo changes
-            </button>
-            <span>•</span>
-            <button 
-              onClick={togglePlayAudio}
-              className="text-teal-700 hover:text-teal-800 font-medium transition flex items-center space-x-1"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Re-listen sentence</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* ASHA Guidance Protocol Box */}
-      <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 flex items-start space-x-3 text-xs">
-        <Sparkles className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <h4 className="font-bold text-sky-950">
-            ASHA Guidance Protocol (ANC Protocol 4.2)
-          </h4>
-          <p className="text-sky-800 leading-relaxed">
-            DHWANI detected early signs of gestational hypertension (BP 130/85 with new bilateral pedal edema & headache). Once verified, the next screen will formulate the PHC referral slip and emergency follow-up alert.
-          </p>
+      {/* ASHA Guidance Protocol Box — only shown when report indicates danger signs */}
+      {reportResult && (reportResult.report as any)?.danger_signs?.length > 0 && (
+        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 flex items-start space-x-3 text-xs">
+          <Sparkles className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="font-bold text-sky-950">
+              ASHA Clinical Guidance
+            </h4>
+            <p className="text-sky-800 leading-relaxed">
+              AI detected potential danger signs in the recorded visit. Review the extracted fields carefully. The next screen will help you verify vitals and generate a referral if needed.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Spoken Read-Back & Correction */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-          <span>AI Read-Back of Visit Report</span>
-          {reportResult && (
-            <button
-              onClick={replayReport}
-              className="text-teal-700 bg-teal-50 hover:bg-teal-100 px-3 py-1 rounded-lg border border-teal-200 transition"
+      {/* Spoken Read-Back & Conversational Voice Correction */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-slate-700">
+          <div className="flex items-center space-x-2">
+            <span>AI Read-Back of Visit Report</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                isReportConfirmed
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                  : 'bg-amber-50 text-amber-800 border border-amber-200'
+              }`}
             >
-              Replay read-back
+              {isReportConfirmed ? 'Confirmed ✓' : 'Unconfirmed Draft'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={replayReport}
+              className="flex items-center space-x-1 text-teal-700 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg border border-teal-200 transition"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>Read Report Aloud</span>
             </button>
-          )}
+
+            <button
+              type="button"
+              onClick={() => {
+                if (isListeningForCorrection) {
+                  stopVoiceCorrectionListening();
+                } else {
+                  void startVoiceCorrectionListening();
+                }
+              }}
+              disabled={isReportLoading}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-bold transition disabled:opacity-50 ${
+                isListeningForCorrection
+                  ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse'
+                  : 'bg-teal-700 hover:bg-teal-800 text-white'
+              }`}
+            >
+              {isListeningForCorrection ? (
+                <>
+                  <Square className="w-3 h-3" />
+                  <span>Stop & Send Voice</span>
+                </>
+              ) : (
+                <>
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>Speak Correction / Confirm</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {isReportLoading && (
@@ -307,37 +323,223 @@ export const ReviewTranscript: React.FC = () => {
         )}
 
         {reportError && (
-          <p role="alert" className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
-            Report service error: {reportError}
-          </p>
+          <div role="alert" className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
+            <p className="font-semibold">Report service error: {reportError}</p>
+            {reportErrorMessage && <p className="text-[11px] text-red-600">{reportErrorMessage}</p>}
+          </div>
+        )}
+
+        {/* Identity Validation Gate */}
+        {hasIdentityIssue && (
+          <div role="alert" className="bg-amber-50 border border-amber-300 rounded-xl p-3 space-y-2 text-xs text-amber-950">
+            <div className="flex items-center space-x-2 font-bold">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                {activeVisit.identityStatus === 'mismatch'
+                  ? 'Patient Identity Mismatch'
+                  : activeVisit.identityStatus === 'ambiguous'
+                  ? 'Patient Name Ambiguous — Please Confirm'
+                  : 'Patient Name Required Before Confirmation'}
+              </span>
+            </div>
+            <p className="text-[11px] text-amber-900">
+              {activeVisit.identityMismatchDetail ||
+                'Confirm or type the exact patient name from this visit, or select the matching beneficiary.'}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={identityInput}
+                onChange={(e) => setIdentityInput(e.target.value)}
+                placeholder="Enter exact patient name (Hindi/English)"
+                className="flex-1 min-w-[180px] text-xs bg-white border border-amber-300 rounded-lg px-2.5 py-1.5 text-slate-900"
+              />
+              <button
+                type="button"
+                disabled={!identityInput.trim()}
+                onClick={() => {
+                  confirmPatientIdentity(identityInput);
+                  setIdentityInput('');
+                }}
+                className="text-xs font-bold bg-amber-700 hover:bg-amber-800 text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
+              >
+                Confirm Name
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsBeneficiaryModalOpen(true)}
+                className="text-xs font-semibold bg-white border border-amber-300 text-amber-900 px-3 py-1.5 rounded-lg hover:bg-amber-100"
+              >
+                Select Beneficiary
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Structured Visit Data Snapshot (Single Source of Truth) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs bg-slate-50 rounded-xl border border-slate-200/80 p-3">
+          <div>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Patient Name</span>
+            <span className="font-bold text-slate-900">
+              {displayName || 'Name not provided'}
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Blood Pressure</span>
+            <span className="font-bold text-slate-900">
+              {activeVisit.vitals.systolic != null && activeVisit.vitals.diastolic != null
+                ? `${activeVisit.vitals.systolic}/${activeVisit.vitals.diastolic} mmHg`
+                : 'Not provided'}
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Weight</span>
+            <span className="font-bold text-slate-900">
+              {activeVisit.vitals.weight != null ? `${activeVisit.vitals.weight} kg` : 'Not provided'}
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Visit Type</span>
+            <span className="font-bold text-slate-900">{activeVisit.visitType || 'Not provided'}</span>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Next Visit</span>
+            <span className="font-bold text-slate-900">{activeVisit.nextVisitDate || 'Not provided'}</span>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Vaccination</span>
+            <span className="font-bold text-slate-900">
+              {activeVisit.vaccinationStatus || 'Not provided'}
+            </span>
+            <span className="text-[10px] text-slate-500 block">
+              Booster: {activeVisit.boosterStatus || 'Not provided'}
+            </span>
+          </div>
+        </div>
+
+        {/* Information to confirm (unmentioned clinical details, never auto-populated) */}
+        {activeVisit.missingInformation && activeVisit.missingInformation.length > 0 && (
+          <div className="bg-slate-50/90 border border-slate-200 rounded-xl p-3 space-y-1.5 text-xs">
+            <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+              Information to confirm
+            </div>
+            <ul className="space-y-1 list-disc list-inside text-slate-700">
+              {activeVisit.missingInformation.map((item, idx) => (
+                <li key={`${item.field_name}-${idx}`}>
+                  <span className="font-semibold">{item.field_name}:</span>{' '}
+                  {item.prompt_question || item.reason || 'Not provided in transcript.'}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {reportResult && (
-          <>
+          <div className="space-y-1">
             <p className="text-xs text-slate-700 leading-relaxed">
               {String((reportResult.report as { summary?: string }).summary ?? '')}
             </p>
             <p className="text-[11px] text-slate-400">{reportResult.disclaimer}</p>
+          </div>
+        )}
 
-            <div className="flex items-center gap-2">
-              <input
-                value={correctionText}
-                onChange={(e) => setCorrectionText(e.target.value)}
-                placeholder="Correction, e.g. Sunita ka weight 3.1 kilo hai"
-                className="flex-1 text-xs border border-slate-200 rounded-xl px-3 py-2"
-              />
-              <button
-                onClick={async () => {
-                  await submitCorrection(correctionText);
-                  setCorrectionText('');
-                }}
-                disabled={isReportLoading || !correctionText.trim()}
-                className="text-xs font-bold text-white bg-teal-700 hover:bg-teal-800 px-4 py-2 rounded-xl disabled:opacity-50"
+        {/* Live Voice Listening Preview */}
+        {isListeningForCorrection && (
+          <div className="bg-red-50/70 border border-red-200 rounded-xl p-3 text-xs text-red-800 flex items-center justify-between">
+            <span className="font-medium">
+              {correctionLiveTranscript
+                ? `Hearing: "${correctionLiveTranscript}"`
+                : 'Listening via Gnani STT... Say a correction (e.g. "Nahi, BP 110/90 hai") or "Haan, correct hai".'}
+            </span>
+          </div>
+        )}
+
+        {/* Conversation Log */}
+        {conversationLog.length > 0 && (
+          <div className="space-y-2 max-h-48 overflow-y-auto bg-slate-50/70 border border-slate-200/70 rounded-xl p-3">
+            {conversationLog.map((msg) => (
+              <div
+                key={msg.id}
+                className={`text-xs px-3 py-2 rounded-xl ${
+                  msg.role === 'worker'
+                    ? 'bg-teal-700 text-white ml-8'
+                    : msg.action === 'clarify'
+                    ? 'bg-amber-50 text-amber-900 border border-amber-200 mr-8'
+                    : msg.action === 'confirmed'
+                    ? 'bg-emerald-50 text-emerald-900 border border-emerald-200 mr-8'
+                    : 'bg-white text-slate-800 border border-slate-200 mr-8'
+                }`}
               >
-                Apply correction
-              </button>
+                <span className="text-[10px] font-bold uppercase opacity-75 block mb-0.5">
+                  {msg.role === 'worker' ? 'ASHA Worker' : 'Dhwani AI'}
+                </span>
+                <span>{msg.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Typed Correction / Confirmation Fallback + Explicit Confirm Button */}
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={correctionText}
+            onChange={(e) => setCorrectionText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && correctionText.trim() && !isReportLoading) {
+                const txt = correctionText;
+                setCorrectionText('');
+                void submitCorrection(txt, 'text');
+              }
+            }}
+            placeholder='Say or type correction, e.g. "Nahi, BP 110/90 hai", "Weight 58 kg hai", or "Haan, correct hai"'
+            className="flex-1 min-w-[220px] text-xs border border-slate-200 rounded-xl px-3 py-2"
+          />
+          <button
+            type="button"
+            onClick={async () => {
+              const txt = correctionText;
+              setCorrectionText('');
+              await submitCorrection(txt, 'text');
+            }}
+            disabled={isReportLoading || !correctionText.trim()}
+            className="text-xs font-bold text-white bg-teal-700 hover:bg-teal-800 px-4 py-2 rounded-xl disabled:opacity-50"
+          >
+            Apply correction
+          </button>
+          <button
+            type="button"
+            onClick={() => void confirmConversationalReport()}
+            disabled={isReportLoading || isReportConfirmed || hasIdentityIssue}
+            className="text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3.5 py-2 rounded-xl disabled:opacity-50"
+          >
+            {isReportConfirmed ? 'Confirmed ✓' : 'Confirm Report'}
+          </button>
+        </div>
+
+        {/* Correction Audit Trail */}
+        {activeVisit.correctionHistory && activeVisit.correctionHistory.length > 0 && (
+          <div className="border-t border-slate-100 pt-3 space-y-1.5">
+            <div className="flex items-center space-x-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <History className="w-3.5 h-3.5 text-teal-600" />
+              <span>Correction Audit Trail ({activeVisit.correctionHistory.length})</span>
             </div>
-          </>
+            <div className="space-y-1">
+              {activeVisit.correctionHistory.map((item, idx) => (
+                <div
+                  key={`${item.timestamp}-${item.field}-${idx}`}
+                  className="text-[11px] text-slate-600 flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100"
+                >
+                  <span>
+                    <strong className="text-slate-800">{item.field}</strong>:{' '}
+                    <span className="line-through text-slate-400">{String(item.originalValue ?? 'None')}</span>{' '}
+                    → <span className="font-semibold text-teal-800">{String(item.correctedValue)}</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {item.source} • {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 

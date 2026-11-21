@@ -26,6 +26,12 @@ export const Dashboard: React.FC = () => {
 
   const pendingTasks = followUpTasks.slice(0, 2);
   const workerFirstName = currentUser ? currentUser.name.split(' ')[0] : 'Sunita';
+  const currentDateFormatted = new Date().toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
@@ -40,7 +46,7 @@ export const Dashboard: React.FC = () => {
             Namaste, {workerFirstName} ji
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Ready for today's community visits in Rampur {currentUser?.ward || 'Ward 4'} • <span className="text-slate-700 font-medium">{currentUser?.allocatedHouseholds || 6} households allocated</span>
+            {currentDateFormatted} • Ready for visits in Rampur {currentUser?.ward || 'Ward 4'} • <span className="text-slate-700 font-medium">{currentUser?.allocatedHouseholds || 6} households allocated</span>
           </p>
         </div>
 

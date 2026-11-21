@@ -177,17 +177,23 @@ export const VisitHistory: React.FC = () => {
 
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-bold text-slate-900">{item.beneficiaryName}</h3>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      {item.beneficiaryName || 'Name not provided'}
+                    </h3>
                     {item.spouseName && (
                       <span className="text-xs text-slate-400">
                         ({item.spouseName.includes('Child') ? item.spouseName : `W/o ${item.spouseName}`})
                       </span>
                     )}
-                    <span className="text-xs text-slate-400">• Age: {item.age}</span>
-                    <span className="bg-teal-50 text-teal-800 text-[11px] font-semibold px-2 py-0.2 rounded border border-teal-200">
-                      {item.visitType}
+                    <span className="text-xs text-slate-400">
+                      • Age: {item.age != null ? item.age : 'Not provided'}
                     </span>
-                    <span className="text-xs text-slate-400 font-medium">RCH ID: {item.rchId}</span>
+                    <span className="bg-teal-50 text-teal-800 text-[11px] font-semibold px-2 py-0.2 rounded border border-teal-200">
+                      {item.visitType || 'Not provided'}
+                    </span>
+                    {item.rchId && (
+                      <span className="text-xs text-slate-400 font-medium">RCH ID: {item.rchId}</span>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">

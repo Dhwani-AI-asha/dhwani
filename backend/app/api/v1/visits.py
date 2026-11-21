@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.schemas.visit import VisitCreate, VisitResponse
+from app.schemas.visit import VisitCreate, VisitResponse, VisitUpdate
 from app.services.patient_service import get_patient_by_id
-from app.services.visit_service import create_visit, get_visit_by_id
+from app.services.visit_service import create_visit, get_visit_by_id, update_visit_report
 
 router = APIRouter(prefix="/visits", tags=["Visits"])
 
@@ -58,3 +58,25 @@ def get_visit(
             detail=f"Visit with ID '{visit_id}' not found."
         )
     return visit
+
+
+@router.patch(
+    "/{visit_id}",
+    response_model=VisitResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update structured visit report",
+    description="Persists updated structured visit report fields (such as voice corrections, correction history, and confirmation status) for an existing visit."
+)
+def patch_visit(
+    visit_id: str,
+    visit_update: VisitUpdate,
+    db: Session = Depends(get_db)
+) -> VisitResponse:
+    """Update an existing visit's structured report. Returns 404 if visit is not found."""
+    visit = get_visit_by_id(db=db, visit_id=visit_id)
+    if not visit:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Visit with ID '{visit_id}' not found."
+        )
+    return update_visit_report(db=db, visit=visit, visit_update=visit_update)

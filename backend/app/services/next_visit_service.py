@@ -24,6 +24,18 @@ from app.services.visit_service import get_visits_by_patient_id
 from app.services.care_promise_service import get_care_promises
 
 
+def _normalize_danger_signs(raw_signs) -> List[str]:
+    """Normalize danger signs to string labels whether stored as strings or structured DangerSign dicts."""
+    normalized: List[str] = []
+    for item in raw_signs or []:
+        if isinstance(item, dict):
+            label = item.get("sign") or item.get("evidence") or str(item)
+            normalized.append(str(label))
+        else:
+            normalized.append(str(item))
+    return normalized
+
+
 def generate_next_visit_summary(
     db: Session,
     patient_id: str,
@@ -68,7 +80,7 @@ def generate_next_visit_summary(
             chief_complaint=rep.get("chief_complaint"),
             summary=rep.get("summary"),
             symptoms=symptoms_list,
-            danger_signs=rep.get("danger_signs", []),
+            danger_signs=_normalize_danger_signs(rep.get("danger_signs", [])),
             vital_signs_mentioned=rep.get("vital_signs_mentioned"),
             professional_review_required=rep.get("professional_review_required", False),
             missing_information=missing_info_list,
@@ -84,7 +96,7 @@ def generate_next_visit_summary(
                     visit_date=prev.visit_date,
                     chief_complaint=prev_rep.get("chief_complaint"),
                     summary=prev_rep.get("summary"),
-                    danger_signs=prev_rep.get("danger_signs", []),
+                    danger_signs=_normalize_danger_signs(prev_rep.get("danger_signs", [])),
                     professional_review_required=prev_rep.get("professional_review_required", False)
                 )
             )

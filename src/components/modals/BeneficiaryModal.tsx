@@ -1,15 +1,17 @@
 import React from 'react';
-import { X, CheckCircle2, UserCheck } from 'lucide-react';
+import { X, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { mockBeneficiaries } from '../../data/mockData';
 import { Beneficiary } from '../../types';
 
 export const BeneficiaryModal: React.FC = () => {
   const { 
     isBeneficiaryModalOpen, 
     setIsBeneficiaryModalOpen, 
+    beneficiaries,
     activeBeneficiary, 
-    setActiveBeneficiary 
+    isBeneficiarySelected,
+    setActiveBeneficiary,
+    clearBeneficiarySelection,
   } = useApp();
 
   if (!isBeneficiaryModalOpen) return null;
@@ -38,8 +40,29 @@ export const BeneficiaryModal: React.FC = () => {
         </div>
 
         <div className="p-4 space-y-2.5 max-h-[60vh] overflow-y-auto">
-          {mockBeneficiaries.map((b) => {
-            const isSelected = b.id === activeBeneficiary.id;
+          <div
+            onClick={() => {
+              clearBeneficiarySelection();
+              setIsBeneficiaryModalOpen(false);
+            }}
+            className={`p-3 rounded-xl border cursor-pointer transition flex items-center justify-between ${
+              !isBeneficiarySelected
+                ? 'bg-teal-50/70 border-teal-300 shadow-2xs'
+                : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            <div>
+              <h4 className="text-xs font-bold text-slate-900">Unselected / Extract Patient from Speech</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Use the exact name stated in the voice recording without attaching a pre-selected patient.
+              </p>
+            </div>
+            {!isBeneficiarySelected && (
+              <CheckCircle2 className="w-5 h-5 text-teal-700 shrink-0 ml-2" />
+            )}
+          </div>
+          {beneficiaries.map((b) => {
+            const isSelected = isBeneficiarySelected && b.id === activeBeneficiary.id;
             return (
               <div
                 key={b.id}
@@ -67,7 +90,7 @@ export const BeneficiaryModal: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      {b.age} Yrs • {b.village}, {b.gali || ''} • RCH ID: {b.rchId}
+                      {b.age != null ? `${b.age} Yrs` : 'Age: Not provided'} • {b.village}, {b.gali || ''} • RCH ID: {b.rchId || 'Not provided'}
                     </p>
                   </div>
                 </div>

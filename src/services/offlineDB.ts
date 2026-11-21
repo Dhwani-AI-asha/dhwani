@@ -1,8 +1,9 @@
-import type { StoredVisitRecord, StructuredVisitData, SyncCounts, SyncStatus } from '../types/index.ts';
+import type { FollowUpTask, StoredVisitRecord, StructuredVisitData, SyncCounts, SyncStatus } from '../types/index.ts';
 
 const DB_NAME = 'dhwani_offline_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'visits';
+const FOLLOW_UPS_STORE_NAME = 'follow_ups';
 
 /**
  * Open or upgrade the native IndexedDB database.
@@ -21,6 +22,9 @@ function openDB(): Promise<IDBDatabase> {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
         store.createIndex('syncStatus', 'syncStatus', { unique: false });
         store.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(FOLLOW_UPS_STORE_NAME)) {
+        db.createObjectStore(FOLLOW_UPS_STORE_NAME, { keyPath: 'id' });
       }
     };
 
@@ -399,4 +403,151 @@ export function calculateSyncCounts(records: StoredVisitRecord[] = []): SyncCoun
     total: Array.isArray(records) ? records.length : 0,
   };
 }
+
+/**
+ * Save or update a FollowUpTask record in IndexedDB.
+ */
+export async function saveFollowUpRecord(task: FollowUpTask): Promise<FollowUpTask> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    let finished = false;
+
+    const safeReject = (err: any) => {
+      if (finished) return;
+      finished = true;
+      closeDB(db);
+      reject(err);
+    };
+
+    const safeResolve = (t: FollowUpTask) => {
+      if (finished) return;
+      finished = true;
+      closeDB(db);
+      resolve(t);
+    };
+
+    try {
+      const transaction = db.transaction([FOLLOW_UPS_STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(FOLLOW_UPS_STORE_NAME);
+      const putRequest = store.put(JSON.parse(JSON.stringify(task)));
+
+      putRequest.onerror = () => {
+        safeReject(putRequest.error || new Error(`Failed to save follow-up task ${task.id}`));
+      };
+
+      transaction.oncomplete = () => {
+        safeResolve(task);
+      };
+
+      transaction.onerror = () => {
+        safeReject(transaction.error || new Error(`Transaction failed saving follow-up task ${task.id}`));
+      };
+    } catch (err) {
+      safeReject(err);
+    }
+  });
+}
+
+/**
+ * Retrieve all FollowUpTasks stored in IndexedDB.
+ */
+export async function getAllFollowUpTasks(): Promise<FollowUpTask[]> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    let tasks: FollowUpTask[] = [];
+    let finished = false;
+
+    const safeReject = (err: any) => {
+      if (finished) return;
+      finished = true;
+      closeDB(db);
+      reject(err);
+    };
+
+    const safeResolve = (res: FollowUpTask[]) => {
+      if (finished) return;
+      finished = true;
+      closeDB(db);
+      resolve(res);
+    };
+
+    try {
+      const transaction = db.transaction([FOLLOW_UPS_STORE_NAME], 'readonly');
+      const store = transaction.objectStore(FOLLOW_UPS_STORE_NAME);
+      const getAllRequest = store.getAll();
+
+      getAllRequest.onsuccess = () => {
+        tasks = getAllRequest.result || [];
+      };
+
+      getAllRequest.onerror = () => {
+        safeReject(getAllRequest.error || new Error('Failed to fetch follow-ups from IndexedDB'));
+      };
+
+      transaction.oncomplete = () => {
+        safeResolve(tasks);
+      };
+
+      transaction.onerror = () => {
+        safeReject(transaction.error || new Error('Transaction failed reading follow-ups'));
+      };
+    } catch (err) {
+      safeReject(err);
+    }
+  });
+}
+
+/**
+ * Update the completion status of a follow-up task in IndexedDB.
+ */
+export async function updateFollowUpStatus(id: string, isCompleted: boolean): Promise<boolean> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    let finished = false;
+
+    const safeReject = (err: any) => {
+      if (finished) return;
+      finished = true;
+      closeDB(db);
+      reject(err);
+    };
+
+    const safeResolve = (res: boolean) => {
+      if (finished) return;
+      finished = true;
+      closeDB(db);
+      resolve(res);
+    };
+
+    try {
+      const transaction = db.transaction([FOLLOW_UPS_STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(FOLLOW_UPS_STORE_NAME);
+      const getRequest = store.get(id);
+
+      getRequest.onsuccess = () => {
+        const task = getRequest.result as FollowUpTask | undefined;
+        if (!task) {
+          return;
+        }
+        task.isCompleted = isCompleted;
+        store.put(task);
+      };
+
+      getRequest.onerror = () => {
+        safeReject(getRequest.error || new Error(`Failed to find follow-up ${id}`));
+      };
+
+      transaction.oncomplete = () => {
+        safeResolve(true);
+      };
+
+      transaction.onerror = () => {
+        safeReject(transaction.error || new Error(`Transaction failed updating follow-up ${id}`));
+      };
+    } catch (err) {
+      safeReject(err);
+    }
+  });
+}
+
 

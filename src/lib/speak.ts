@@ -3,6 +3,11 @@
  * POSTs to http://localhost:8000/tts and plays the returned WAV audio.
  */
 
+const VOICE_HTTP_BASE =
+  (typeof import.meta !== 'undefined' &&
+    (import.meta as unknown as { env?: { VITE_VOICE_HTTP_URL?: string } }).env?.VITE_VOICE_HTTP_URL) ||
+  'http://localhost:8000';
+
 let activeAudio: HTMLAudioElement | null = null;
 let activeResolve: ((value: boolean) => void) | null = null;
 
@@ -51,7 +56,7 @@ export function speak(
     (async () => {
       let audioUrl = '';
       try {
-        const response = await fetch('http://localhost:8000/tts', {
+        const response = await fetch(`${VOICE_HTTP_BASE}/tts`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

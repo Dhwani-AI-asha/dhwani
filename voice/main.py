@@ -38,17 +38,37 @@ HEADERS = {
 
 app = FastAPI(title="Voice STT Backend")
 
-from report_api import router as report_router  # noqa: E402
+try:
+    from voice.report_api import router as report_router  # noqa: E402
+except ImportError:
+    from report_api import router as report_router  # noqa: E402
 app.include_router(report_router)
+
+# Configurable CORS for local dev + Vercel deployments (falls back to '*' if unset)
+_raw_cors = os.getenv("CORS_ORIGINS", "").strip()
+_frontend_url = os.getenv("FRONTEND_URL", "").strip()
+_cors_origins = [o.strip() for o in _raw_cors.split(",") if o.strip()] if _raw_cors else []
+if _frontend_url and _frontend_url not in _cors_origins:
+    _cors_origins.append(_frontend_url)
+if not _cors_origins:
+    _cors_origins = ["*"]
+_cors_origin_regex = os.getenv("CORS_ORIGIN_REGEX", "").strip() or None
 
 # Enable CORS for frontend requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_origin_regex=_cors_origin_regex,
+    allow_credentials="*" not in _cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health", tags=["Health"])
+async def health():
+    """Render health check endpoint."""
+    return {"status": "healthy", "service": "dhwani-voice-and-ai"}
 
 
 class TTSRequest(BaseModel):
@@ -319,4 +339,5 @@ async def websocket_stt_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)

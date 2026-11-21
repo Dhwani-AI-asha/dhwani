@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -31,29 +31,55 @@ export const VerifyStructuredRecord: React.FC = () => {
     triggerDangerSign
   } = useApp();
 
-  // Local state for inline edits
-  const [editingSys, setEditingSys] = useState(activeVisit.vitals.systolic);
-  const [editingDia, setEditingDia] = useState(activeVisit.vitals.diastolic);
-  const [editingWeight, setEditingWeight] = useState(activeVisit.vitals.weight);
-  const [calciumDispensed, setCalciumDispensed] = useState(false);
-  const [headacheConfirmed, setHeadacheConfirmed] = useState(false);
+  // Local state for inline edits (kept in sync with voice corrections in activeVisit)
+  const [editingSys, setEditingSys] = useState<string>(
+    activeVisit.vitals.systolic != null ? String(activeVisit.vitals.systolic) : ''
+  );
+  const [editingDia, setEditingDia] = useState<string>(
+    activeVisit.vitals.diastolic != null ? String(activeVisit.vitals.diastolic) : ''
+  );
+  const [editingWeight, setEditingWeight] = useState<string>(
+    activeVisit.vitals.weight != null ? String(activeVisit.vitals.weight) : ''
+  );
 
-  const handleBpUpdate = (sys: number, dia: number) => {
-    setEditingSys(sys);
-    setEditingDia(dia);
+  useEffect(() => {
+    setEditingSys(activeVisit.vitals.systolic != null ? String(activeVisit.vitals.systolic) : '');
+    setEditingDia(activeVisit.vitals.diastolic != null ? String(activeVisit.vitals.diastolic) : '');
+    setEditingWeight(activeVisit.vitals.weight != null ? String(activeVisit.vitals.weight) : '');
+  }, [activeVisit.vitals.systolic, activeVisit.vitals.diastolic, activeVisit.vitals.weight]);
+
+  const handleBpUpdate = (sysStr: string, diaStr: string) => {
+    setEditingSys(sysStr);
+    setEditingDia(diaStr);
+    const sysVal = sysStr.trim() === '' ? null : Number(sysStr);
+    const diaVal = diaStr.trim() === '' ? null : Number(diaStr);
     setActiveVisit(prev => ({
       ...prev,
-      vitals: { ...prev.vitals, systolic: sys, diastolic: dia }
+      vitals: {
+        ...prev.vitals,
+        systolic: sysVal != null && !Number.isNaN(sysVal) ? sysVal : null,
+        diastolic: diaVal != null && !Number.isNaN(diaVal) ? diaVal : null,
+      },
+      confirmedFields: { ...(prev.confirmedFields || {}), blood_pressure: true },
     }));
   };
 
-  const handleWeightUpdate = (w: number) => {
-    setEditingWeight(w);
+  const handleWeightUpdate = (wStr: string) => {
+    setEditingWeight(wStr);
+    const wVal = wStr.trim() === '' ? null : Number(wStr);
     setActiveVisit(prev => ({
       ...prev,
-      vitals: { ...prev.vitals, weight: w }
+      vitals: { ...prev.vitals, weight: wVal != null && !Number.isNaN(wVal) ? wVal : null },
+      confirmedFields: { ...(prev.confirmedFields || {}), weight: true },
     }));
   };
+
+  const displayName = activeVisit.beneficiary?.name?.trim() || activeBeneficiary.name?.trim() || 'Name not provided';
+  const displayAge = activeVisit.patientAge || (activeBeneficiary.age != null ? `${activeBeneficiary.age}` : 'Not provided');
+  const extractedSymptoms = activeVisit.extractedSymptoms || [];
+  const dangerSigns = Array.isArray((activeVisit.structuredReport as any)?.danger_signs)
+    ? ((activeVisit.structuredReport as any).danger_signs as Array<{ sign?: string; evidence?: string }>)
+    : [];
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-6">
@@ -71,12 +97,18 @@ export const VerifyStructuredRecord: React.FC = () => {
           <span className="font-semibold text-teal-800 uppercase tracking-wider text-[11px]">
             STEP 2 OF 3 • REVIEW
           </span>
-          <span>•</span>
-          <span className="text-slate-500">Voice Processing Complete (Hindi / Awadhi)</span>
-          <span>•</span>
-          <span className="text-slate-500">Original Voice Note (01:42)</span>
-          <span>•</span>
-          <span className="text-emerald-700 font-semibold">Confidence 96.4%</span>
+          {activeVisit.languageDetected && (
+            <>
+              <span>•</span>
+              <span className="text-slate-500">{activeVisit.languageDetected}</span>
+            </>
+          )}
+          {activeVisit.audioDurationText && (
+            <>
+              <span>•</span>
+              <span className="text-slate-500">{activeVisit.audioDurationText}</span>
+            </>
+          )}
         </div>
 
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
@@ -97,26 +129,26 @@ export const VerifyStructuredRecord: React.FC = () => {
           />
           <div>
             <div className="flex items-center space-x-2">
-              <h3 className="text-base font-bold text-slate-900">{activeBeneficiary.name}</h3>
+              <h3 className="text-base font-bold text-slate-900">{displayName}</h3>
               {activeVisit.lastCorrectedField === 'Beneficiary Name' && (
                 <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-2 py-0.2 rounded-full">
                   Voice Updated ✓
                 </span>
               )}
-              <span className="text-xs text-slate-400 font-medium">RCH ID: {activeBeneficiary.rchId}</span>
-              <span className="text-xs text-slate-500">Age {activeBeneficiary.age}</span>
+              <span className="text-xs text-slate-400 font-medium">RCH ID: {activeBeneficiary.rchId || 'Not provided'}</span>
+              <span className="text-xs text-slate-500">Age: {displayAge}</span>
             </div>
             <div className="flex items-center space-x-2 text-xs text-slate-500 mt-0.5">
-              <span className="text-slate-700 font-medium">{activeVisit.visitType}</span>
+              <span className="text-slate-700 font-medium">{activeVisit.visitType || 'Visit type: Not provided'}</span>
               {activeVisit.lastCorrectedField === 'Visit Type' && (
                 <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-2 py-0.2 rounded-full">
                   Voice Updated ✓
                 </span>
               )}
               <span>•</span>
-              <span>EDD: {activeBeneficiary.edd || '18 Dec 2024'}</span>
+              <span>EDD: {activeBeneficiary.edd || 'Not provided'}</span>
               <span>•</span>
-              <span>24 Oct 2024</span>
+              <span>{activeVisit.visitDate || 'Not provided'}</span>
             </div>
           </div>
         </div>
@@ -237,17 +269,24 @@ export const VerifyStructuredRecord: React.FC = () => {
                 <span className="font-semibold text-slate-700">
                   Blood Pressure (Systolic / Diastolic) <span className="font-normal text-slate-400">mmHg</span>
                 </span>
-                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  Confirmed
-                </span>
+                {activeVisit.lastCorrectedField === 'Blood Pressure' ? (
+                  <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    Voice Updated ✓
+                  </span>
+                ) : (
+                  <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    Confirmed
+                  </span>
+                )}
               </div>
               <div className="flex items-center space-x-2">
                 <div className="flex items-center space-x-1">
                   <span className="text-[10px] font-bold text-slate-400">SYS</span>
                   <input
                     type="number"
+                    placeholder="—"
                     value={editingSys}
-                    onChange={(e) => handleBpUpdate(Number(e.target.value), editingDia)}
+                    onChange={(e) => handleBpUpdate(e.target.value, editingDia)}
                     className="w-16 bg-white border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-900 text-center focus:ring-1 focus:ring-teal-600 focus:outline-none"
                   />
                 </div>
@@ -256,15 +295,18 @@ export const VerifyStructuredRecord: React.FC = () => {
                   <span className="text-[10px] font-bold text-slate-400">DIA</span>
                   <input
                     type="number"
+                    placeholder="—"
                     value={editingDia}
-                    onChange={(e) => handleBpUpdate(editingSys, Number(e.target.value))}
+                    onChange={(e) => handleBpUpdate(editingSys, e.target.value)}
                     className="w-16 bg-white border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-900 text-center focus:ring-1 focus:ring-teal-600 focus:outline-none"
                   />
                 </div>
                 <Pencil className="w-3.5 h-3.5 text-slate-400 ml-auto cursor-pointer hover:text-slate-600" />
               </div>
-              <p className="text-[10px] text-amber-700 font-medium">
-                ⓘ Mild prehypertension threshold. Previous visit: 118/78 mmHg.
+              <p className="text-[10px] text-slate-500 font-medium">
+                {activeVisit.vitals.systolic != null && activeVisit.vitals.diastolic != null
+                  ? `Recorded: ${activeVisit.vitals.systolic}/${activeVisit.vitals.diastolic} mmHg`
+                  : 'BP: Not provided in transcript'}
               </p>
             </div>
 
@@ -274,16 +316,18 @@ export const VerifyStructuredRecord: React.FC = () => {
               <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 space-y-1">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-slate-700">Pulse Rate</span>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
-                    Speech
+                  <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded">
+                    {activeVisit.vitals.pulseStatus || 'Not provided'}
                   </span>
                 </div>
                 <div className="flex items-baseline space-x-1">
-                  <span className="text-lg font-bold text-slate-900">78</span>
-                  <span className="text-xs text-slate-500">bpm</span>
-                  <Pencil className="w-3 h-3 text-slate-400 ml-auto cursor-pointer" />
+                  <span className="text-lg font-bold text-slate-900">
+                    {activeVisit.vitals.pulseRate != null ? activeVisit.vitals.pulseRate : 'Not provided'}
+                  </span>
+                  {activeVisit.vitals.pulseRate != null && (
+                    <span className="text-xs text-slate-500">bpm</span>
+                  )}
                 </div>
-                <p className="text-[10px] text-slate-400">Normal resting rhythm</p>
               </div>
 
               {/* Maternal Weight */}
@@ -295,22 +339,26 @@ export const VerifyStructuredRecord: React.FC = () => {
                       Voice Updated ✓
                     </span>
                   ) : (
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
-                      Speech
+                    <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded">
+                      {activeVisit.vitals.weight != null ? 'Speech' : 'Not provided'}
                     </span>
                   )}
                 </div>
                 <div className="flex items-baseline space-x-1">
                   <input
                     type="number"
-                    value={activeVisit.vitals.weight}
-                    onChange={(e) => handleWeightUpdate(Number(e.target.value))}
-                    className="w-14 bg-white border border-slate-300 rounded px-1.5 py-0.5 text-sm font-bold text-slate-900 text-center"
+                    placeholder="Not provided"
+                    value={editingWeight}
+                    onChange={(e) => handleWeightUpdate(e.target.value)}
+                    className="w-24 bg-white border border-slate-300 rounded px-1.5 py-0.5 text-xs font-bold text-slate-900 text-center"
                   />
-                  <span className="text-xs text-slate-500">kg</span>
-                  <Pencil className="w-3 h-3 text-slate-400 ml-auto cursor-pointer" />
+                  {activeVisit.vitals.weight != null && (
+                    <span className="text-xs text-slate-500">kg</span>
+                  )}
                 </div>
-                <p className="text-[10px] text-emerald-700 font-medium">+2.0 kg in 4 weeks (Ideal trajectory)</p>
+                <p className="text-[10px] text-slate-500 font-medium">
+                  {activeVisit.vitals.weight != null ? `${activeVisit.vitals.weight} kg recorded` : 'Weight not provided'}
+                </p>
               </div>
             </div>
 
@@ -319,10 +367,14 @@ export const VerifyStructuredRecord: React.FC = () => {
               <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 flex items-center justify-between">
                 <div>
                   <span className="text-xs font-semibold text-slate-700 block">Gestational Age</span>
-                  <span className="text-[10px] text-slate-400">From LMP: 14 Mar 2024</span>
+                  <span className="text-[10px] text-slate-400">
+                    LMP: {activeVisit.vitals.lmpDate || 'Not provided'}
+                  </span>
                 </div>
-                <span className="text-xs font-bold text-teal-800 bg-teal-100/70 px-2 py-1 rounded-lg">
-                  32 Weeks
+                <span className="text-xs font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg">
+                  {activeVisit.vitals.gestationalAgeWeeks != null
+                    ? `${activeVisit.vitals.gestationalAgeWeeks} Weeks`
+                    : 'Not provided'}
                 </span>
               </div>
 
@@ -338,9 +390,9 @@ export const VerifyStructuredRecord: React.FC = () => {
                   </div>
                   <span className="text-[10px] text-slate-400">Scheduled Follow-up</span>
                 </div>
-                <div className="flex items-center space-x-1 text-xs font-bold text-teal-900 bg-teal-100/70 px-2 py-1 rounded-lg">
-                  <Calendar className="w-3 h-3 text-teal-700" />
-                  <span>{activeVisit.nextVisitDate}</span>
+                <div className="flex items-center space-x-1 text-xs font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg">
+                  <Calendar className="w-3 h-3 text-slate-600" />
+                  <span>{activeVisit.nextVisitDate || 'Not provided'}</span>
                 </div>
               </div>
             </div>
@@ -368,68 +420,40 @@ export const VerifyStructuredRecord: React.FC = () => {
             <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 flex items-center justify-between">
               <div className="space-y-0.5">
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs font-bold text-slate-800">IFA Tablets Compliance</span>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
-                    ✓ Speech
+                  <span className="text-xs font-bold text-slate-800">IFA Tablets</span>
+                  <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded">
+                    {activeVisit.medications.ifaTablets.source || 'Not provided'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 font-medium">
-                  Taking regularly • 15 tabs remaining
+                  {activeVisit.medications.ifaTablets.takingRegularly != null
+                    ? `${activeVisit.medications.ifaTablets.takingRegularly ? 'Taking regularly' : 'Irregular'}${activeVisit.medications.ifaTablets.remainingTabs != null ? ` • ${activeVisit.medications.ifaTablets.remainingTabs} tabs remaining` : ''}`
+                    : 'Not provided'}
                 </p>
               </div>
-              <Pencil className="w-3.5 h-3.5 text-slate-400 cursor-pointer hover:text-slate-600" />
             </div>
 
             {/* Calcium Tablets */}
             <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 flex items-center justify-between">
               <div className="space-y-0.5">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs font-bold text-slate-800">Calcium Tablets (500mg)</span>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                    calciumDispensed ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {calciumDispensed ? 'Dispensed' : 'Needs Refill'}
-                  </span>
-                </div>
+                <span className="text-xs font-bold text-slate-800 block">Calcium / Other Medications</span>
                 <p className="text-xs text-slate-600">
-                  {calciumDispensed ? '30 tablets dispensed from kit' : 'Stock exhausted 3 days ago'}
+                  {activeVisit.medications.calciumTablets.status || 'Not provided'}
                 </p>
               </div>
-              <button
-                onClick={() => setCalciumDispensed(prev => !prev)}
-                className={`flex items-center space-x-1 text-xs font-semibold px-2.5 py-1 rounded-lg transition ${
-                  calciumDispensed
-                    ? 'bg-slate-200 text-slate-700'
-                    : 'bg-teal-700 hover:bg-teal-800 text-white shadow-2xs'
-                }`}
-              >
-                <Plus className="w-3 h-3" />
-                <span>{calciumDispensed ? 'Undo' : 'Dispense 30'}</span>
-              </button>
             </div>
 
             {/* Diet & Nutrition Advice */}
             <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800">Diet & Nutrition Advice</span>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
-                  ✓ Advised
+                <span className="text-xs font-bold text-slate-800">Diet & Nutrition Notes</span>
+                <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded">
+                  {activeVisit.medications.dietAdvice.advised ? 'Recorded' : 'Not provided'}
                 </span>
               </div>
               <p className="text-xs text-slate-600 leading-normal">
-                High protein intake (Dal/Egg) & green leafy vegetables emphasized for mild pallor.
+                {activeVisit.medications.dietAdvice.description || 'Not provided'}
               </p>
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-[10px] font-semibold bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded">
-                  High Protein
-                </span>
-                <span className="text-[10px] font-semibold bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded">
-                  Hydration
-                </span>
-                <span className="text-[10px] font-semibold bg-red-50 border border-red-200 text-red-700 px-2 py-0.5 rounded">
-                  Low Salt Notice
-                </span>
-              </div>
             </div>
           </div>
         </div>
@@ -445,90 +469,58 @@ export const VerifyStructuredRecord: React.FC = () => {
                 <h3 className="text-xs font-bold text-slate-900">
                   2. Symptoms & Clinical Observations
                 </h3>
-                <p className="text-[10px] text-slate-400">2 high-priority observations identified</p>
+                <p className="text-[10px] text-slate-400">
+                  {extractedSymptoms.length > 0
+                    ? `${extractedSymptoms.length} extracted from transcript`
+                    : 'No symptoms stated in transcript'}
+                </p>
               </div>
             </div>
-            <span className="text-[11px] font-semibold text-red-800 bg-red-50 px-2 py-0.5 rounded-full">
-              Requires Verification
-            </span>
           </div>
 
-          <div className="space-y-3.5">
-            {/* Pedal Edema */}
-            <div className="p-3 bg-red-50/60 rounded-xl border border-red-200/80 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-red-950 flex items-center space-x-1.5">
+          <div className="space-y-3">
+            {extractedSymptoms.length > 0 ? (
+              extractedSymptoms.map((sym, idx) => (
+                <div key={`${sym.name}-${idx}`} className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 space-y-1 text-xs">
+                  <div className="font-bold text-slate-900">{sym.name}</div>
+                  <div className="text-[11px] text-slate-600">
+                    Duration: {sym.duration || 'Not provided'} • Severity: {sym.severity || 'Not provided'} • Site: {sym.body_site || 'Not provided'}
+                  </div>
+                  {sym.notes && <p className="text-[11px] text-slate-500">{sym.notes}</p>}
+                </div>
+              ))
+            ) : (
+              <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 text-xs text-slate-500">
+                Symptoms: Not provided in transcript.
+              </div>
+            )}
+
+            {dangerSigns.length > 0 && (
+              <div className="p-3 bg-red-50/60 rounded-xl border border-red-200/80 space-y-1 text-xs">
+                <div className="font-bold text-red-900 flex items-center space-x-1.5">
                   <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
-                  <span>Pedal Edema (पैरों में सूजन)</span>
-                </span>
-                <span className="text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.2 rounded-full">
-                  ⚠️ Flagged observation
-                </span>
-              </div>
-              <p className="text-xs text-slate-700">
-                Beneficiary noted visible swelling in feet and ankles since the last 48 hours.
-              </p>
-              <div className="flex items-center justify-between pt-1">
-                <select className="bg-white border border-slate-300 text-xs font-medium text-slate-800 rounded-lg px-2.5 py-1.5 focus:outline-none">
-                  <option>Present - Mild / Bilateral (Grading +1)</option>
-                  <option>Present - Moderate (Grading +2)</option>
-                  <option>Absent</option>
-                </select>
-                <button className="text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition">
-                  Add Note
-                </button>
-              </div>
-            </div>
-
-            {/* Headache */}
-            <div className="p-3 bg-red-50/60 rounded-xl border border-red-200/80 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-red-950 flex items-center space-x-1.5">
-                  <span className="w-2 h-2 rounded-full bg-red-600"></span>
-                  <span>Headache (सिरदर्द)</span>
-                </span>
-                <span className="text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.2 rounded-full">
-                  ⚠️ Requires attention
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 italic">
-                Extracted statement: "कल दोपहर से लगातार हल्का भारीपन और सिरदर्द बना हुआ है।"
-              </p>
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-xs font-medium text-slate-700 bg-white px-2 py-1 rounded border border-slate-200">
-                  Present - Reported since yesterday (Mild-th)
-                </span>
-                <button
-                  onClick={() => setHeadacheConfirmed(prev => !prev)}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
-                    headacheConfirmed
-                      ? 'bg-emerald-700 text-white'
-                      : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {headacheConfirmed ? '✓ Confirmed' : 'Confirm'}
-                </button>
-              </div>
-            </div>
-
-            {/* Fetal Movements & Pallor */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70 flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-slate-800 block text-[11px]">Fetal Movements (बच्चे की हलचल)</span>
-                  <span className="text-[10px] text-emerald-700 font-medium">Active & Normal (&gt;10 kicks/day)</span>
+                  <span>Danger Signs Detected</span>
                 </div>
-                <Pencil className="w-3 h-3 text-slate-400 cursor-pointer" />
+                {dangerSigns.map((ds, i) => (
+                  <p key={i} className="text-red-800">
+                    {ds.sign || 'Warning'} {ds.evidence ? `(Evidence: "${ds.evidence}")` : ''}
+                  </p>
+                ))}
               </div>
+            )}
 
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70 flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-slate-800 block text-[11px]">Pallor / Eye Conjunctiva</span>
-                  <span className="text-[10px] text-slate-500">Mild Pallor (Possible low iron)</span>
-                </div>
-                <Pencil className="w-3 h-3 text-slate-400 cursor-pointer" />
+            {activeVisit.missingInformation && activeVisit.missingInformation.length > 0 && (
+              <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200/80 space-y-1 text-xs">
+                <div className="font-bold text-amber-900">Information to confirm</div>
+                <ul className="list-disc list-inside text-[11px] text-amber-900 space-y-0.5">
+                  {activeVisit.missingInformation.map((m, idx) => (
+                    <li key={`${m.field_name}-${idx}`}>
+                      <span className="font-semibold">{m.field_name}:</span> {m.prompt_question || m.reason || 'Not provided'}
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -543,31 +535,28 @@ export const VerifyStructuredRecord: React.FC = () => {
                 <h3 className="text-xs font-bold text-slate-900">
                   4. Immunization & Lab Status
                 </h3>
-                <p className="text-[10px] text-slate-400">Synchronized with Block PHC Data</p>
+                <p className="text-[10px] text-slate-400">Source-verified visit immunization details</p>
               </div>
             </div>
           </div>
 
           <div className="space-y-3.5">
-            {/* TT-2 / Booster Dose */}
-            <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 flex items-center justify-between">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs font-bold text-slate-800">TT-2 / Booster Dose</span>
-                  {activeVisit.lastCorrectedField === 'Vaccination TT Booster' ? (
-                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded">
-                      Voice Updated ✓
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
-                      ✓ Verified
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Administered on 18 Sep 2024 (Rampur PHC)
-                </p>
+            {/* Vaccination & Booster Status */}
+            <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800">Vaccination Status</span>
+                {(activeVisit.lastCorrectedField === 'Vaccination TT Booster' || activeVisit.lastCorrectedField === 'Vaccination Status') && (
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded">
+                    Voice Updated ✓
+                  </span>
+                )}
               </div>
+              <p className="text-xs font-semibold text-slate-800">
+                {activeVisit.vaccinationStatus || 'Not provided'}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Booster status: {activeVisit.boosterStatus || 'Not provided'} • Dose number: {activeVisit.doseNumber || 'Not provided'}
+              </p>
             </div>
 
             {/* Hemoglobin */}
@@ -575,33 +564,28 @@ export const VerifyStructuredRecord: React.FC = () => {
               <div>
                 <div className="flex items-center space-x-2">
                   <span className="text-xs font-bold text-slate-800">Hemoglobin (Hb)</span>
-                  <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.2 rounded">
-                    10.2 g/dL • Mild Anemia
+                  <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.2 rounded">
+                    {activeVisit.immunizationLab.hemoglobin.value != null
+                      ? `${activeVisit.immunizationLab.hemoglobin.value} ${activeVisit.immunizationLab.hemoglobin.unit || 'g/dL'}`
+                      : 'Not provided'}
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  Last tested: 28 Aug 2024
-                </p>
               </div>
-              <button className="text-xs font-semibold text-teal-700 hover:underline">
-                Request Re-test
-              </button>
             </div>
 
-            {/* Potential Pre-Eclampsia Flag Card */}
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-3">
-              <div className="w-6 h-6 rounded-lg bg-red-600 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                !
+            {dangerSigns.length > 0 && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-3">
+                <div className="w-6 h-6 rounded-lg bg-red-600 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                  !
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-red-950">Clinical Red-Flag Review Recommended</h4>
+                  <p className="text-[11px] text-red-800 mt-0.5 leading-normal">
+                    Danger sign detected in transcript requires qualified medical evaluation.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-xs font-bold text-red-950">
-                  Potential Pre-Eclampsia Flag
-                </h4>
-                <p className="text-[11px] text-red-800 mt-0.5 leading-normal">
-                  Combination of BP (130/85) + bilateral edema + persistent headache warrants immediate PHC Medical Officer consultation.
-                </p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -610,7 +594,7 @@ export const VerifyStructuredRecord: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 border-t border-slate-200/80">
         <div className="flex items-center space-x-2 text-xs text-slate-500">
           <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span>Draft auto-saved at 10:48 AM • Offline cache synced</span>
+          <span>Draft saved to local device cache</span>
         </div>
 
         <div className="flex items-center space-x-3">

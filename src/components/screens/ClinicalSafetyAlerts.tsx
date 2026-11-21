@@ -20,6 +20,7 @@ import { useApp } from '../../context/AppContext';
 export const ClinicalSafetyAlerts: React.FC = () => {
   const { 
     activeBeneficiary, 
+    activeVisit,
     setCurrentScreen, 
     setIsReferralModalOpen, 
     setIsCallMoModalOpen,
@@ -28,6 +29,16 @@ export const ClinicalSafetyAlerts: React.FC = () => {
     visitSaveError,
     clearVisitSaveError
   } = useApp();
+
+  const patientNameDisplay = activeVisit.beneficiary?.name?.trim() || activeBeneficiary.name?.trim() || 'Name not provided';
+  const bpDisplay =
+    activeVisit.vitals.systolic != null && activeVisit.vitals.diastolic != null
+      ? `${activeVisit.vitals.systolic}/${activeVisit.vitals.diastolic}`
+      : 'Not provided';
+  const weightDisplay = activeVisit.vitals.weight != null ? `${activeVisit.vitals.weight} kg` : 'Not provided';
+  const dangerSigns = Array.isArray((activeVisit.structuredReport as any)?.danger_signs)
+    ? ((activeVisit.structuredReport as any).danger_signs as Array<{ sign?: string; evidence?: string }>)
+    : [];
 
   // Counseling checklist state
   const [checklist, setChecklist] = useState({
@@ -104,22 +115,22 @@ export const ClinicalSafetyAlerts: React.FC = () => {
           />
           <div>
             <div className="flex items-center space-x-2">
-              <h3 className="text-base font-bold text-slate-900">{activeBeneficiary.name}</h3>
-              <span className="text-xs text-slate-400">RCH ID: {activeBeneficiary.rchId}</span>
+              <h3 className="text-base font-bold text-slate-900">{patientNameDisplay}</h3>
+              <span className="text-xs text-slate-400">RCH ID: {activeBeneficiary.rchId || 'Not provided'}</span>
             </div>
             <div className="flex items-center space-x-3 text-xs text-slate-500 mt-0.5">
-              <span className="text-teal-700 font-medium">ANC 32 Weeks (3rd Trimester)</span>
+              <span className="text-teal-700 font-medium">{activeVisit.visitType || 'Visit type: Not provided'}</span>
               <span>•</span>
-              <span>Age: {activeBeneficiary.age} yrs</span>
+              <span>Age: {activeVisit.patientAge || (activeBeneficiary.age != null ? `${activeBeneficiary.age} yrs` : 'Not provided')}</span>
               <span>•</span>
-              <span>{activeBeneficiary.ward}, Rampur</span>
+              <span>{activeBeneficiary.ward || 'Not provided'}</span>
             </div>
           </div>
         </div>
 
         <div className="text-right text-xs text-slate-500 space-y-0.5">
-          <div>Recorded At: <span className="font-semibold text-slate-800">24 Oct 2024, 10:18 AM</span></div>
-          <div>Field Attendant: <span className="font-semibold text-slate-800">Sunita Devi (ASHA)</span></div>
+          <div>Visit Date: <span className="font-semibold text-slate-800">{activeVisit.visitDate || 'Not provided'}</span></div>
+          <div>Next Visit: <span className="font-semibold text-slate-800">{activeVisit.nextVisitDate || 'Not provided'}</span></div>
         </div>
       </div>
 
@@ -131,61 +142,71 @@ export const ClinicalSafetyAlerts: React.FC = () => {
           </div>
           <div>
             <div className="text-[10px] font-bold text-red-700 uppercase tracking-wider">
-              PROTOCOL RED-FLAG RULE MATCHED • ANC-PIH-04
+              {dangerSigns.length > 0 ? 'CLINICAL RED-FLAG ALERT' : 'VISIT SAFETY REVIEW'}
             </div>
             <h2 className="text-lg font-bold text-red-950 mt-0.5">
-              Potential High-Risk Danger Sign Identified (Protocol Warning)
+              {dangerSigns.length > 0
+                ? 'Potential Danger Sign Identified from Visit Transcript'
+                : 'No Danger Signs Explicitly Reported in Transcript'}
             </h2>
             <p className="text-xs text-red-800 mt-0.5">
-              The field assistant detected signs meeting immediate escalation criteria under Government Maternal Health Safety Guidelines.
+              Absence of reported danger signs does not rule out underlying risk; verify all missing information before closing the visit.
             </p>
           </div>
         </div>
 
-        {/* 3 Specific Factors Identified */}
         <div className="space-y-2">
           <div className="text-xs font-bold text-slate-700">
-            Observed Findings Triggering Alert — 3 Specific Factors Identified
+            Source-Grounded Clinical Summary
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {/* Factor 1: Vitals */}
+            {/* Metric 1: BP & Weight */}
             <div className="bg-white rounded-xl border border-red-200 p-4 space-y-1.5 shadow-2xs">
               <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                 <span>Vitals Metric</span>
-                <span className="text-red-500">*</span>
               </div>
-              <div className="text-lg font-bold text-slate-900">130/85 <span className="text-xs font-normal text-slate-500">mmHg</span></div>
+              <div className="text-lg font-bold text-slate-900">
+                {bpDisplay} {bpDisplay !== 'Not provided' && <span className="text-xs font-normal text-slate-500">mmHg</span>}
+              </div>
               <p className="text-xs text-slate-600 leading-normal">
-                Blood Pressure recorded at 130/85 mmHg (Elevated baseline for 3rd trimester).
+                Weight: {weightDisplay}
               </p>
-              <div className="text-[10px] text-slate-400 pt-1 font-medium">Prior baseline: 110/70 mmHg</div>
+              <div className="text-[10px] text-slate-500 pt-1 font-medium">
+                Vaccination: {activeVisit.vaccinationStatus || 'Not provided'} (Booster: {activeVisit.boosterStatus || 'Not provided'})
+              </div>
             </div>
 
-            {/* Factor 2: Physical Sign */}
+            {/* Metric 2: Danger Signs */}
             <div className="bg-white rounded-xl border border-red-200 p-4 space-y-1.5 shadow-2xs">
               <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                <span>Physical Sign</span>
+                <span>Danger Signs</span>
                 <Activity className="w-3.5 h-3.5 text-red-500" />
               </div>
-              <div className="text-base font-bold text-slate-900">Bilateral Pedal Edema</div>
+              <div className="text-base font-bold text-slate-900">
+                {dangerSigns.length > 0 ? dangerSigns.map((d) => d.sign).join(', ') : 'None flagged'}
+              </div>
               <p className="text-xs text-slate-600 leading-normal">
-                New onset bilateral pedal edema (पैरों में सूजन) reported for 3 consecutive days.
+                {dangerSigns.length > 0
+                  ? `Evidence: "${dangerSigns.map((d) => d.evidence).filter(Boolean).join('; ')}"`
+                  : 'No acute warning signs stated in transcript.'}
               </p>
-              <div className="text-[10px] text-slate-400 pt-1 font-medium">Pitting: Mild to Moderate</div>
             </div>
 
-            {/* Factor 3: Symptom Log */}
+            {/* Metric 3: Reported Symptoms */}
             <div className="bg-white rounded-xl border border-red-200 p-4 space-y-1.5 shadow-2xs">
               <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                <span>Symptom Log</span>
+                <span>Symptoms Log</span>
                 <Clock className="w-3.5 h-3.5 text-red-500" />
               </div>
-              <div className="text-base font-bold text-slate-900">Mild Headache</div>
+              <div className="text-base font-bold text-slate-900">
+                {activeVisit.extractedSymptoms && activeVisit.extractedSymptoms.length > 0
+                  ? activeVisit.extractedSymptoms.map((s) => s.name).join(', ')
+                  : 'Not provided'}
+              </div>
               <p className="text-xs text-slate-600 leading-normal">
-                Concurrent mild headache (सिरदर्द) reported by beneficiary.
+                Extracted strictly from visit transcript.
               </p>
-              <div className="text-[10px] text-slate-400 pt-1 font-medium">Onset: Past 24 hours</div>
             </div>
           </div>
         </div>
@@ -194,13 +215,10 @@ export const ClinicalSafetyAlerts: React.FC = () => {
         <div className="bg-white/80 rounded-xl border border-red-200/80 p-3.5 text-xs text-slate-700 space-y-1">
           <div className="font-bold text-red-950 flex items-center space-x-1.5">
             <ShieldAlert className="w-4 h-4 text-red-600" />
-            <span>STANDARD MATERNAL HEALTH PROTOCOL ALERT</span>
+            <span>CLINICAL DOCUMENTATION REMINDER</span>
           </div>
           <p className="text-xs text-slate-700 leading-relaxed">
-            The combination of elevated blood pressure with persistent edema and headache during the 3rd trimester indicates potential risk of pregnancy-induced hypertension (Pre-eclampsia). Immediate clinical assessment is recommended.
-          </p>
-          <p className="text-[10px] text-slate-400 italic pt-0.5">
-            Note: This is an automated safety alert governed by MOHFW Pre-eclampsia Screening guidelines. It does NOT constitute a definitive physician diagnosis.
+            Escalate immediately if any danger signs are present. Note: Automated extraction does NOT constitute a physician diagnosis.
           </p>
         </div>
       </div>
@@ -211,29 +229,20 @@ export const ClinicalSafetyAlerts: React.FC = () => {
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
           <div className="space-y-1">
             <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-              Priority 1 Action Required
+              PHC Escalation Option
             </span>
-            <span className="text-xs text-slate-400 font-medium ml-2">PHC Referral Protocol</span>
             <h3 className="text-base font-bold text-slate-900 mt-1">
               Escalate to Primary Health Centre (PHC) Medical Officer
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Arrange immediate transportation or escort Pooja Devi to Rampur PHC today for urine albumin screening and medical officer evaluation.
+              Arrange immediate transportation or escort {patientNameDisplay} to the nearest PHC if medical evaluation is required.
             </p>
           </div>
 
           <div className="bg-slate-50 rounded-xl border border-slate-200/80 p-3.5 space-y-2 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">Designated Center:</span>
-              <span className="font-bold text-slate-800">Rampur PHC (2.8 km)</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">On-Duty MO:</span>
-              <span className="font-bold text-slate-800">Dr. Rajesh Varma (MBBS)</span>
-            </div>
-            <div className="flex items-center justify-between">
               <span className="text-slate-500 font-medium">Ambulance Dispatch Helpline:</span>
-              <span className="font-bold text-teal-800">Dial 108 / Rampur Unit Active</span>
+              <span className="font-bold text-teal-800">Dial 108</span>
             </div>
           </div>
 
@@ -265,7 +274,7 @@ export const ClinicalSafetyAlerts: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-slate-500">
-            Complete mandatory face-to-face counseling steps with Pooja Devi before saving this field log.
+            Complete mandatory face-to-face counseling steps with {patientNameDisplay} before saving this field log.
           </p>
 
           <div className="space-y-3">
@@ -280,7 +289,7 @@ export const ClinicalSafetyAlerts: React.FC = () => {
               <div className="text-xs">
                 <span className="font-bold text-slate-800 block">Diet & Posture Care</span>
                 <span className="text-slate-500">
-                  Advised beneficiary to rest on left side and avoid excess salt.
+                  Reviewed general care instructions appropriate for the visit.
                 </span>
               </div>
             </label>
@@ -296,7 +305,7 @@ export const ClinicalSafetyAlerts: React.FC = () => {
               <div className="text-xs">
                 <span className="font-bold text-slate-800 block">Family Emergency Briefing</span>
                 <span className="text-slate-500">
-                  Informed family members (husband Manoj Kumar) about emergency danger signs (blurred vision, severe abdominal pain).
+                  Informed family members about danger signs requiring immediate PHC visit.
                 </span>
               </div>
             </label>
@@ -310,9 +319,9 @@ export const ClinicalSafetyAlerts: React.FC = () => {
                 className="mt-0.5 rounded text-teal-700 focus:ring-teal-600 w-4 h-4"
               />
               <div className="text-xs">
-                <span className="font-bold text-slate-800 block">Emergency Follow-up</span>
+                <span className="font-bold text-slate-800 block">Follow-up Planning</span>
                 <span className="text-slate-500">
-                  Scheduled emergency 48-hour follow-up home visit for 26 Oct 2024.
+                  Next visit date: {activeVisit.nextVisitDate || 'Not provided'}.
                 </span>
               </div>
             </label>

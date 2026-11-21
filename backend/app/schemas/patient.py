@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class PatientBase(BaseModel):
     """Common fields for patient demographic records."""
     name: str = Field(..., min_length=1, max_length=120, description="Full name of patient")
-    age: int = Field(..., ge=0, le=130, description="Patient age in years")
+    age: Optional[int] = Field(None, ge=0, le=130, description="Patient age in years if explicitly known")
     gender: Optional[str] = Field(None, max_length=20, description="Optional gender: Female, Male, Other")
     contact_number: Optional[str] = Field(None, max_length=20, description="Optional phone number")
     address: Optional[str] = Field(None, max_length=255, description="Optional residential address or village/ward")
@@ -73,7 +73,7 @@ class PatientResponse(BaseModel):
     """
     patient_id: str
     name: str
-    age: int
+    age: Optional[int] = None
     gender: Optional[str] = None
     contact_number: Optional[str] = None
     address: Optional[str] = None

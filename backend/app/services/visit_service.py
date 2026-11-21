@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.visit import Visit
 from app.models.patient import Patient
-from app.schemas.visit import VisitCreate
+from app.schemas.visit import VisitCreate, VisitUpdate
 
 
 def generate_unique_visit_id(db: Session, target_year: Optional[int] = None) -> str:
@@ -90,3 +90,22 @@ def get_visit_by_id(db: Session, visit_id: str) -> Optional[Visit]:
     Retrieves a single visit by its unique visit ID (e.g. VIS-2026-0001).
     """
     return db.query(Visit).filter(Visit.visit_id == visit_id).first()
+
+
+def update_visit_report(
+    db: Session,
+    visit: Visit,
+    visit_update: VisitUpdate
+) -> Visit:
+    """
+    Persist an updated structured medical report (including voice corrections,
+    audit trail, and confirmation status) onto an existing visit record.
+    Does NOT overwrite registered patient profile details.
+    """
+    visit.report = visit_update.report.model_dump()
+    if visit_update.visit_date is not None:
+        visit.visit_date = visit_update.visit_date
+
+    db.commit()
+    db.refresh(visit)
+    return visit

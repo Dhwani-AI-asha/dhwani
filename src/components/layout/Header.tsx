@@ -5,6 +5,12 @@ import { useApp } from '../../context/AppContext';
 export const Header: React.FC = () => {
   const { startRecording, currentUser, logout, isOnline, pendingAttentionCount, setCurrentScreen } = useApp();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const currentDateFormatted = new Date().toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 relative z-30">
@@ -19,7 +25,7 @@ export const Header: React.FC = () => {
         <span>/</span>
         <div className="hidden lg:flex items-center space-x-1 text-slate-500">
           <Calendar className="w-3.5 h-3.5" />
-          <span>Wednesday, 24 Oct 2024</span>
+          <span>{currentDateFormatted}</span>
         </div>
         <span className="hidden lg:inline">/</span>
 

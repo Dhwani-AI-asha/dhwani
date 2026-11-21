@@ -23,6 +23,7 @@ try:
     from ai_medical.extraction_engine import ExtractionEngine, ModelInvocationError
     from ai_medical.validation import ReportValidationError
     from ai_medical.report_narration import generate_narration_result
+    from ai_medical.grounding import ground_report_dict
     from ai_medical.correction import (
         CorrectionError,
         build_corrected_transcript,
@@ -32,6 +33,7 @@ except ImportError:
     from extraction_engine import ExtractionEngine, ModelInvocationError
     from validation import ReportValidationError
     from report_narration import generate_narration_result
+    from grounding import ground_report_dict
     from correction import CorrectionError, build_corrected_transcript
 
 
@@ -78,6 +80,54 @@ def to_speech_text(narration: str) -> str:
     return " ".join(pieces)
 
 
+SAFE_REASON_MESSAGES: Dict[str, str] = {
+    "missing_api_key": (
+        "AI report model is not configured: LLM_API_KEY (or GEMINI_API_KEY) is missing in .env. "
+        "Your recorded transcript and visit data have been preserved."
+    ),
+    "missing_model": (
+        "AI report model is not configured: LLM_MODEL is missing in .env (for example, gemini-2.5-flash). "
+        "Your recorded transcript and visit data have been preserved."
+    ),
+    "invalid_model": (
+        "Configured LLM_MODEL is not supported or not found by the Gemini provider. "
+        "Update LLM_MODEL in .env to a valid Gemini model ID. Visit data has been preserved."
+    ),
+    "auth_error": (
+        "AI model authentication failed. Check that LLM_API_KEY in .env is valid and has Gemini API access. "
+        "Visit data has been preserved."
+    ),
+    "rate_limited": (
+        "AI model provider rate limit or quota was exceeded. Please try again shortly. "
+        "Visit data has been preserved."
+    ),
+    "network_error": (
+        "Could not reach the AI model provider. Check internet connectivity and try again. "
+        "Visit data has been preserved."
+    ),
+    "provider_error": (
+        "AI model provider returned an error. Please try again shortly. "
+        "Visit data has been preserved."
+    ),
+    "empty_response": (
+        "AI model returned an empty response. Please try again. "
+        "Visit data has been preserved."
+    ),
+}
+
+
+def _safe_model_failure_reason(err: Exception) -> Optional[str]:
+    """
+    Extract a strictly allowlisted diagnostic reason from a ModelInvocationError chain.
+    Never returns raw exception messages, transcript text, or credentials.
+    """
+    cause = getattr(err, "__cause__", None)
+    reason = getattr(cause, "reason", None)
+    if isinstance(reason, str) and reason in SAFE_REASON_MESSAGES:
+        return reason
+    return None
+
+
 def _run_extraction(
     engine: ExtractionEngine,
     input_data: TranscriptInput,
@@ -89,7 +139,10 @@ def _run_extraction(
         try:
             return engine.process(input_data)
         except ModelInvocationError as err:
-            raise ServiceError("model_unavailable") from err
+            raise ServiceError(
+                "model_unavailable",
+                detail=_safe_model_failure_reason(err),
+            ) from err
         except ReportValidationError as err:
             last_error = err  # fully re-validated on the next attempt
     raise ServiceError(
@@ -105,6 +158,7 @@ def generate_report_package(
     patient_id: Optional[str] = None,
     language: Optional[str] = None,
     max_attempts: int = 2,
+    selected_patient_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Generate a validated report plus language-matched narration.
@@ -132,16 +186,29 @@ def generate_report_package(
         raise ServiceError("empty_transcript") from err
 
     report = _run_extraction(engine, input_data, max_attempts)
-    narration = generate_narration_result(report, transcript=input_data.raw_text)
+    grounded_dict = ground_report_dict(
+        report.model_dump(),
+        transcript=input_data.raw_text,
+        selected_patient_name=selected_patient_name,
+    )
+    grounded_model = MedicalReportOutput.model_validate(
+        {k: grounded_dict[k] for k in MedicalReportOutput.model_fields}
+    )
+    narration = generate_narration_result(
+        grounded_model,
+        transcript=input_data.raw_text,
+        grounded_extras=grounded_dict,
+    )
 
     return {
         "ok": True,
-        "report": report.model_dump(),
+        "report": grounded_dict,
         "narration": narration.narration_text,
         "narration_speech": to_speech_text(narration.narration_text),
         "narration_language": narration.language,
         "language_fallback_used": narration.language_detection.fallback_used,
         "transcript_used": input_data.raw_text,
+        "identity_status": grounded_dict.get("identity_status"),
         "disclaimer": DISCLAIMER,
     }
 
@@ -154,6 +221,7 @@ def correct_report_package(
     patient_id: Optional[str] = None,
     language: Optional[str] = None,
     max_attempts: int = 2,
+    selected_patient_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Apply an ASHA correction by appending it to the transcript and regenerating
@@ -174,4 +242,5 @@ def correct_report_package(
         patient_id=patient_id,
         language=language,
         max_attempts=max_attempts,
+        selected_patient_name=selected_patient_name,
     )

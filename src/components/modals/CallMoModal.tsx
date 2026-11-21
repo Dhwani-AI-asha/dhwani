@@ -3,7 +3,7 @@ import { X, PhoneCall, PhoneOff, Mic, ShieldAlert, CheckCircle2 } from 'lucide-r
 import { useApp } from '../../context/AppContext';
 
 export const CallMoModal: React.FC = () => {
-  const { isCallMoModalOpen, setIsCallMoModalOpen } = useApp();
+  const { isCallMoModalOpen, setIsCallMoModalOpen, activeBeneficiary, activeVisit } = useApp();
   const [callStatus, setCallStatus] = useState<'dialing' | 'connected' | 'ended'>('dialing');
   const [callDuration, setCallDuration] = useState(0);
 
@@ -83,7 +83,13 @@ export const CallMoModal: React.FC = () => {
             <span>EMERGENCY DISPATCH CONTEXT</span>
           </div>
           <p className="text-slate-300">
-            Pooja Devi (ANC 32w) - BP 130/85, bilateral edema & frontal headache.
+            {activeVisit.beneficiary?.name?.trim() || activeBeneficiary.name?.trim() || 'Name not provided'}
+            {activeVisit.vitals.systolic != null && activeVisit.vitals.diastolic != null
+              ? ` — BP ${activeVisit.vitals.systolic}/${activeVisit.vitals.diastolic}`
+              : ' — BP: Not provided'}
+            {activeVisit.extractedSymptoms && activeVisit.extractedSymptoms.length > 0
+              ? ` • ${activeVisit.extractedSymptoms.map((s) => s.name).join(', ')}`
+              : ''}
           </p>
           <p className="text-[10px] text-slate-400">
             Ambulance 108 Rampur unit notified on standby.

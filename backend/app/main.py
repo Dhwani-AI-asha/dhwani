@@ -2,6 +2,7 @@
 Main FastAPI application entry point for Dhwani backend.
 """
 
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,11 +26,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS to permit local frontend development (Member 4)
+# Configure CORS to permit local development and deployed Vercel frontend origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX,
+    allow_credentials="*" not in settings.CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -53,3 +55,9 @@ def root():
 def health():
     """Service health check."""
     return {"status": "healthy"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", "8001"))
+    uvicorn.run(app, host="0.0.0.0", port=port)

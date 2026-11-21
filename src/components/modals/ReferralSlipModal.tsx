@@ -3,7 +3,7 @@ import { X, Printer, Download, Share2, ShieldAlert, CheckCircle2 } from 'lucide-
 import { useApp } from '../../context/AppContext';
 
 export const ReferralSlipModal: React.FC = () => {
-  const { isReferralModalOpen, setIsReferralModalOpen, activeBeneficiary } = useApp();
+  const { isReferralModalOpen, setIsReferralModalOpen, activeBeneficiary, activeVisit } = useApp();
 
   if (!isReferralModalOpen) return null;
 
@@ -59,47 +59,62 @@ export const ReferralSlipModal: React.FC = () => {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
             <div>
               <span className="text-[10px] text-slate-400 block font-semibold">PATIENT NAME</span>
-              <span className="font-bold text-slate-900">{activeBeneficiary.name}</span>
+              <span className="font-bold text-slate-900">
+                {activeVisit.beneficiary?.name?.trim() || activeBeneficiary.name?.trim() || 'Name not provided'}
+              </span>
             </div>
             <div>
               <span className="text-[10px] text-slate-400 block font-semibold">SPOUSE / GUARDIAN</span>
-              <span className="font-semibold text-slate-800">{activeBeneficiary.spouseName || 'Manoj Kumar'}</span>
+              <span className="font-semibold text-slate-800">{activeBeneficiary.spouseName || 'Not provided'}</span>
             </div>
             <div>
               <span className="text-[10px] text-slate-400 block font-semibold">AGE & GESTATION</span>
-              <span className="font-semibold text-slate-800">{activeBeneficiary.age} Yrs • 32 Weeks</span>
+              <span className="font-semibold text-slate-800">
+                {activeVisit.patientAge || (activeBeneficiary.age != null ? `${activeBeneficiary.age} Yrs` : 'Not provided')}
+                {activeVisit.vitals.gestationalAgeWeeks != null ? ` • ${activeVisit.vitals.gestationalAgeWeeks} Weeks` : ''}
+              </span>
             </div>
             <div>
               <span className="text-[10px] text-slate-400 block font-semibold">RCH ID</span>
-              <span className="font-bold text-slate-900">{activeBeneficiary.rchId}</span>
+              <span className="font-bold text-slate-900">{activeBeneficiary.rchId || 'Not provided'}</span>
             </div>
             <div>
               <span className="text-[10px] text-slate-400 block font-semibold">ADDRESS</span>
-              <span className="font-semibold text-slate-800">{activeBeneficiary.village}, {activeBeneficiary.gali || ''}</span>
+              <span className="font-semibold text-slate-800">
+                {activeBeneficiary.village ? `${activeBeneficiary.village}${activeBeneficiary.gali ? `, ${activeBeneficiary.gali}` : ''}` : 'Not provided'}
+              </span>
             </div>
             <div>
               <span className="text-[10px] text-slate-400 block font-semibold">CONTACT</span>
-              <span className="font-semibold text-teal-800">{activeBeneficiary.contactNumber || '+91 98721 44510'}</span>
+              <span className="font-semibold text-teal-800">{activeBeneficiary.contactNumber || 'Not provided'}</span>
             </div>
           </div>
 
           {/* Clinical Reasons for Referral */}
           <div className="space-y-2 border border-red-200 bg-red-50/50 p-4 rounded-xl">
             <h5 className="font-bold text-red-950 flex items-center space-x-1.5">
-              <span>Reason for Emergency Referral: Suspected Pre-Eclampsia</span>
+              <span>Recorded Clinical Summary for Referral</span>
             </h5>
             <ul className="space-y-1.5 text-xs text-slate-700 list-disc list-inside">
               <li>
-                <span className="font-bold text-slate-900">Elevated Blood Pressure:</span> Recorded at 130/85 mmHg (Baseline 110/70 mmHg, 3rd trimester).
+                <span className="font-bold text-slate-900">Blood Pressure:</span>{' '}
+                {activeVisit.vitals.systolic != null && activeVisit.vitals.diastolic != null
+                  ? `${activeVisit.vitals.systolic}/${activeVisit.vitals.diastolic} mmHg`
+                  : 'Not provided'}
               </li>
               <li>
-                <span className="font-bold text-slate-900">Bilateral Pedal Edema:</span> New onset visible pitting swelling in feet/ankles for 3 consecutive days.
+                <span className="font-bold text-slate-900">Weight:</span>{' '}
+                {activeVisit.vitals.weight != null ? `${activeVisit.vitals.weight} kg` : 'Not provided'}
               </li>
               <li>
-                <span className="font-bold text-slate-900">Persistent Headache:</span> Frontal dull ache reported continuously since yesterday.
+                <span className="font-bold text-slate-900">Reported Symptoms:</span>{' '}
+                {activeVisit.extractedSymptoms && activeVisit.extractedSymptoms.length > 0
+                  ? activeVisit.extractedSymptoms.map((s) => s.name).join(', ')
+                  : 'Not provided'}
               </li>
               <li>
-                <span className="font-bold text-slate-900">Lab History:</span> Hb 10.2 g/dL (Mild Anemia). Urine albumin evaluation mandatory.
+                <span className="font-bold text-slate-900">Vaccination Status:</span>{' '}
+                {activeVisit.vaccinationStatus || 'Not provided'}
               </li>
             </ul>
           </div>
