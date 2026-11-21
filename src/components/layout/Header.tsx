@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Calendar, Plus, Radio, LogOut, User } from 'lucide-react';
+import { Calendar, Plus, LogOut, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const Header: React.FC = () => {
-  const { startRecording, currentUser, logout } = useApp();
+  const { startRecording, currentUser, logout, isOnline, pendingAttentionCount, setCurrentScreen } = useApp();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
@@ -17,15 +17,44 @@ export const Header: React.FC = () => {
         <span>/</span>
         <span className="text-slate-600">{currentUser?.ward || "ASHA Assistant"}</span>
         <span>/</span>
-        <div className="flex items-center space-x-1 text-slate-500">
+        <div className="hidden lg:flex items-center space-x-1 text-slate-500">
           <Calendar className="w-3.5 h-3.5" />
           <span>Wednesday, 24 Oct 2024</span>
         </div>
-        <span>/</span>
-        <div className="hidden sm:flex items-center space-x-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full text-[11px] font-semibold">
-          <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
-          <span>System Online • PHC Connected</span>
-        </div>
+        <span className="hidden lg:inline">/</span>
+
+        {/* Real-Time Network Connectivity Indicator (Online / Offline) */}
+        {isOnline ? (
+          <div 
+            className="flex items-center space-x-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+            title="Browser network connection active (remote backend reachability not checked)"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <Wifi className="w-3 h-3 text-emerald-600" />
+            <span>Online</span>
+          </div>
+        ) : (
+          <div 
+            className="flex items-center space-x-1.5 bg-amber-50 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+            title="Device is offline. All records will be stored safely in local IndexedDB."
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+            <WifiOff className="w-3 h-3 text-amber-700" />
+            <span>Offline Mode</span>
+          </div>
+        )}
+
+        {/* Pending Sync Pill (Clickable Shortcut to Sync Centre) */}
+        {pendingAttentionCount > 0 && (
+          <button
+            onClick={() => setCurrentScreen('sync-centre')}
+            className="hidden sm:flex items-center space-x-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer"
+            title="Click to view visits in Sync Centre"
+          >
+            <RefreshCw className="w-3 h-3 text-amber-600" />
+            <span>{pendingAttentionCount} Awaiting Sync</span>
+          </button>
+        )}
       </div>
 
       {/* Right Action buttons */}
