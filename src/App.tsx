@@ -2,6 +2,7 @@ import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
+import { Login } from './components/screens/Login';
 import { Dashboard } from './components/screens/Dashboard';
 import { NewVisitRecording } from './components/screens/NewVisitRecording';
 import { ReviewTranscript } from './components/screens/ReviewTranscript';
@@ -14,9 +15,15 @@ import { BeneficiaryModal } from './components/modals/BeneficiaryModal';
 import { ReferralSlipModal } from './components/modals/ReferralSlipModal';
 import { CallMoModal } from './components/modals/CallMoModal';
 import { ReadBackVoiceModal } from './components/modals/ReadBackVoiceModal';
+import { ImmediateDangerAlertModal } from './components/modals/ImmediateDangerAlertModal';
 
-const MainLayout: React.FC = () => {
-  const { currentScreen } = useApp();
+const AppContent: React.FC = () => {
+  const { currentUser, currentScreen } = useApp();
+
+  // FEATURE 1: If not logged in, render the Login Screen
+  if (!currentUser) {
+    return <Login />;
+  }
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F4F7F6]">
@@ -44,6 +51,7 @@ const MainLayout: React.FC = () => {
       <ReferralSlipModal />
       <CallMoModal />
       <ReadBackVoiceModal />
+      <ImmediateDangerAlertModal />
     </div>
   );
 };
@@ -51,7 +59,7 @@ const MainLayout: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <AppProvider>
-      <MainLayout />
+      <AppContent />
     </AppProvider>
   );
 };

@@ -5,13 +5,14 @@ import {
   Users, 
   FileText, 
   CalendarCheck,
-  Activity
+  Activity,
+  LogOut
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { NavScreen } from '../../types';
 
 export const Sidebar: React.FC = () => {
-  const { currentScreen, setCurrentScreen, startRecording } = useApp();
+  const { currentScreen, setCurrentScreen, startRecording, currentUser, logout } = useApp();
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -90,22 +91,36 @@ export const Sidebar: React.FC = () => {
         </nav>
       </div>
 
-      {/* ASHA Worker Profile Card */}
-      <div className="p-4 border-t border-slate-100">
-        <div className="flex items-center space-x-3 p-2 rounded-lg bg-slate-50 border border-slate-100">
-          <img
-            src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80"
-            alt="Sunita Devi"
-            className="w-10 h-10 rounded-full object-cover border border-slate-200"
-          />
-          <div className="overflow-hidden">
-            <h4 className="text-xs font-bold text-slate-800 truncate">Sunita Devi</h4>
-            <p className="text-[11px] text-slate-500 truncate">ASHA Worker • Ward 4, Rampur</p>
-            <div className="flex items-center space-x-1.5 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span className="text-[10px] font-medium text-emerald-700">Synced with PHC</span>
+      {/* ASHA Worker Profile Card & Logout */}
+      <div className="p-4 border-t border-slate-100 space-y-2">
+        <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+          <div className="flex items-center space-x-3 overflow-hidden">
+            <img
+              src={currentUser?.avatarUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80"}
+              alt={currentUser?.name || "ASHA Worker"}
+              className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
+            />
+            <div className="overflow-hidden">
+              <h4 className="text-xs font-bold text-slate-800 truncate">
+                {currentUser?.name || "Sunita Devi"}
+              </h4>
+              <p className="text-[11px] text-slate-500 truncate">
+                ASHA • {currentUser?.ward || "Ward 4"}, Rampur
+              </p>
+              <div className="flex items-center space-x-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span className="text-[10px] font-semibold text-emerald-700">Synced with PHC</span>
+              </div>
             </div>
           </div>
+
+          <button
+            onClick={logout}
+            title="Log Out (लॉग आउट)"
+            className="w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition shrink-0 ml-1"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </aside>

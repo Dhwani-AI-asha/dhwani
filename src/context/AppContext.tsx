@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
+  AshaWorker,
   Beneficiary, 
+  DangerSignAlert,
   FollowUpTask, 
   NavScreen, 
   StructuredVisitData, 
@@ -8,12 +10,20 @@ import {
 } from '../types';
 import { 
   initialActiveVisit, 
+  mockAshaWorkers,
   mockBeneficiaries, 
   mockFollowUpTasks, 
-  mockVisitHistory 
+  mockVisitHistory,
+  predefinedDangerSigns
 } from '../data/mockData';
 
 interface AppContextType {
+  // Authentication
+  currentUser: AshaWorker | null;
+  login: (workerId: string, pass: string) => { success: boolean; error?: string };
+  logout: () => void;
+
+  // Navigation
   currentScreen: NavScreen;
   setCurrentScreen: (screen: NavScreen) => void;
   activeBeneficiary: Beneficiary;
@@ -40,11 +50,22 @@ interface AppContextType {
   togglePlayAudio: () => void;
   seekAudio: (seconds: number) => void;
   
-  // Voice Read-back & Verification
+  // Voice Read-back & Verification (Feature 2)
   isReadBackActive: boolean;
-  startReadBack: () => void;
+  readBackState: 'idle' | 'speaking' | 'paused' | 'listening';
+  startReadBack: (customText?: string) => void;
+  pauseReadBack: () => void;
+  resumeReadBack: () => void;
   stopReadBack: () => void;
-  applyVoiceCorrection: (field: string, value: any) => void;
+  interruptReadBackForCorrection: () => void;
+  applyVoiceCorrection: (field: 'weight' | 'name' | 'visitType' | 'vaccine' | 'nextDate', value: any) => string;
+  lastCorrectedMessage: string | null;
+
+  // Immediate Danger-Sign Voice Alert (Feature 3)
+  activeDangerAlert: DangerSignAlert | null;
+  triggerDangerSign: (alertId: string) => void;
+  acknowledgeDangerAlert: () => void;
+  clearDangerAlert: () => void;
 
   // Modals
   isBeneficiaryModalOpen: boolean;
@@ -62,6 +83,20 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Authentication State: check localStorage first; if null, user will see Login screen
+  const [currentUser, setCurrentUser] = useState<AshaWorker | null>(() => {
+    const saved = localStorage.getItem('dhwani_asha_worker');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+    // Default logged in as Sunita Devi for seamless initial experience
+    return mockAshaWorkers[0];
+  });
+
   const [currentScreen, setCurrentScreen] = useState<NavScreen>('dashboard');
   const [activeBeneficiary, setActiveBeneficiary] = useState<Beneficiary>(mockBeneficiaries[0]);
   const [activeVisit, setActiveVisit] = useState<StructuredVisitData>(initialActiveVisit);
@@ -70,20 +105,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Recording simulation
   const [isRecording, setIsRecording] = useState<boolean>(false);
-  const [recordingSeconds, setRecordingSeconds] = useState<number>(102); // 01:42 equivalent
+  const [recordingSeconds, setRecordingSeconds] = useState<number>(102);
   const [isPaused, setIsPaused] = useState<boolean>(false);
 
   // Audio Playback simulation
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
-  const [audioCurrentTime, setAudioCurrentTime] = useState<number>(34); // 00:34 / 01:42 as in screenshot
+  const [audioCurrentTime, setAudioCurrentTime] = useState<number>(34);
 
-  // Read-back modal/state
+  // Read-back modal & states
   const [isReadBackActive, setIsReadBackActive] = useState<boolean>(false);
+  const [readBackState, setReadBackState] = useState<'idle' | 'speaking' | 'paused' | 'listening'>('idle');
+  const [lastCorrectedMessage, setLastCorrectedMessage] = useState<string | null>(null);
+
+  // Danger sign active state
+  const [activeDangerAlert, setActiveDangerAlert] = useState<DangerSignAlert | null>(null);
 
   // Modals
   const [isBeneficiaryModalOpen, setIsBeneficiaryModalOpen] = useState<boolean>(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState<boolean>(false);
   const [isCallMoModalOpen, setIsCallMoModalOpen] = useState<boolean>(false);
+
+  // Authentication logic
+  const login = (workerId: string, pass: string): { success: boolean; error?: string } => {
+    const trimmedId = workerId.trim().toUpperCase();
+    const worker = mockAshaWorkers.find(w => w.id.toUpperCase() === trimmedId);
+    
+    if (!worker) {
+      return { 
+        success: false, 
+        error: `Worker ID "${workerId}" not found in Rampur Sub-Center register. Use demo accounts ASHA-9041 to ASHA-9044.` 
+      };
+    }
+
+    if (pass !== 'asha@123') {
+      return { 
+        success: false, 
+        error: 'Invalid password. (For synthetic demo accounts, use password: asha@123)' 
+      };
+    }
+
+    setCurrentUser(worker);
+    localStorage.setItem('dhwani_asha_worker', JSON.stringify(worker));
+    return { success: true };
+  };
+
+  const logout = () => {
+    stopReadBack();
+    clearDangerAlert();
+    setCurrentUser(null);
+    localStorage.removeItem('dhwani_asha_worker');
+  };
 
   // Timer effect for recording
   useEffect(() => {
@@ -144,49 +215,172 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setAudioCurrentTime(seconds);
   };
 
-  // Voice Read-back simulation with Web Speech API
-  const startReadBack = () => {
+  // ==========================================
+  // FEATURE 2: Spoken Report Read-Back & Correction
+  // ==========================================
+  const startReadBack = (customText?: string) => {
     setIsReadBackActive(true);
+    setReadBackState('speaking');
+
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      const textToRead = `पुष्टि हेतु विवरण: लाभार्थी पूजा देवी, बीपी 130 बटा 85, वजन 56 किलो, पैरों में हल्की सूजन और सिरदर्द दर्ज किया गया है। क्या यह सही है?`;
+      const textToRead = customText || 
+        `पुष्टि हेतु विवरण: लाभार्थी ${activeBeneficiary.name}, भेंट प्रकार ${activeVisit.visitType}, बीपी ${activeVisit.vitals.systolic} बटा ${activeVisit.vitals.diastolic}, वजन ${activeVisit.vitals.weight} किलोग्राम, पैरों में हल्की सूजन, टिटनेस टीका सत्यापित, अगली गृह भेंट तारीख ${activeVisit.nextVisitDate}। क्या यह सही है?`;
+      
       const utterance = new SpeechSynthesisUtterance(textToRead);
       utterance.lang = 'hi-IN';
       utterance.rate = 0.95;
       utterance.onend = () => {
-        // Keeps modal active so user can click voice correction or confirm
+        setReadBackState('idle');
+      };
+      utterance.onerror = () => {
+        setReadBackState('idle');
       };
       window.speechSynthesis.speak(utterance);
     }
   };
 
+  const pauseReadBack = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.pause();
+      setReadBackState('paused');
+    }
+  };
+
+  const resumeReadBack = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.resume();
+      setReadBackState('speaking');
+    }
+  };
+
   const stopReadBack = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setReadBackState('idle');
     setIsReadBackActive(false);
+  };
+
+  const interruptReadBackForCorrection = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setReadBackState('listening');
+  };
+
+  // Atomic voice correction to specific field
+  const applyVoiceCorrection = (field: 'weight' | 'name' | 'visitType' | 'vaccine' | 'nextDate', value: any): string => {
+    let confirmationHindi = '';
+    let updatedFieldLabel = '';
+
+    if (field === 'weight') {
+      setActiveVisit(prev => ({
+        ...prev,
+        vitals: { ...prev.vitals, weight: Number(value) },
+        lastCorrectedField: 'Maternal Weight'
+      }));
+      updatedFieldLabel = `वजन ${value} kg`;
+      confirmationHindi = `वजन सुधार दिया गया है। नया वजन ${value} किलोग्राम दर्ज हुआ। क्या यह सही है?`;
+    } else if (field === 'name') {
+      setActiveBeneficiary(prev => ({ ...prev, name: value }));
+      setActiveVisit(prev => ({
+        ...prev,
+        beneficiary: { ...prev.beneficiary, name: value },
+        lastCorrectedField: 'Beneficiary Name'
+      }));
+      updatedFieldLabel = `नाम: ${value}`;
+      confirmationHindi = `लाभार्थी का नाम बदलकर ${value} कर दिया गया है। क्या यह सही है?`;
+    } else if (field === 'visitType') {
+      setActiveVisit(prev => ({
+        ...prev,
+        visitType: value,
+        lastCorrectedField: 'Visit Type'
+      }));
+      updatedFieldLabel = `भेंट: ${value}`;
+      confirmationHindi = `भेंट का प्रकार ${value} दर्ज किया गया। क्या यह सही है?`;
+    } else if (field === 'vaccine') {
+      setActiveVisit(prev => ({
+        ...prev,
+        immunizationLab: {
+          ...prev.immunizationLab,
+          ttBooster: { ...prev.immunizationLab.ttBooster, administered: true, verified: true }
+        },
+        lastCorrectedField: 'Vaccination TT Booster'
+      }));
+      updatedFieldLabel = `टीका: TT Booster सत्यापित`;
+      confirmationHindi = `टिटनेस बूस्टर टीका आज लगा दिया गया है, रिकॉर्ड में सत्यापित किया गया। क्या यह सही है?`;
+    } else if (field === 'nextDate') {
+      setActiveVisit(prev => ({
+        ...prev,
+        nextVisitDate: value,
+        lastCorrectedField: 'Next Visit Date'
+      }));
+      updatedFieldLabel = `अगली तारीख: ${value}`;
+      confirmationHindi = `अगली गृह भेंट की तारीख ${value} निर्धारित कर दी गई है। क्या यह सही है?`;
+    }
+
+    setLastCorrectedMessage(updatedFieldLabel);
+    setReadBackState('speaking');
+
+    // Read back the updated value aloud
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(confirmationHindi);
+      utterance.lang = 'hi-IN';
+      utterance.rate = 0.95;
+      utterance.onend = () => setReadBackState('idle');
+      window.speechSynthesis.speak(utterance);
+    }
+
+    return updatedFieldLabel;
+  };
+
+  // ==========================================
+  // FEATURE 3: Immediate Danger-Sign Voice Alert
+  // ==========================================
+  const triggerDangerSign = (alertId: string) => {
+    // 1. Immediately interrupt any running normal report read-back!
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setReadBackState('idle');
+
+    // 2. Locate danger sign rule
+    const alertObj = predefinedDangerSigns.find(ds => ds.id === alertId) || predefinedDangerSigns[0];
+    const activatedAlert: DangerSignAlert = { ...alertObj, isAcknowledged: false };
+    setActiveDangerAlert(activatedAlert);
+
+    // 3. Flag visit record as ESCALATED
+    setActiveVisit(prev => ({
+      ...prev,
+      status: 'ESCALATED',
+      dangerAlertTriggered: true
+    }));
+
+    // 4. Speak urgent audible warning immediately
+    if ('speechSynthesis' in window) {
+      const urgentUtterance = new SpeechSynthesisUtterance(activatedAlert.hindiVoiceAlert);
+      urgentUtterance.lang = 'hi-IN';
+      urgentUtterance.rate = 0.95;
+      window.speechSynthesis.speak(urgentUtterance);
+    }
+  };
+
+  const acknowledgeDangerAlert = () => {
+    if (activeDangerAlert) {
+      setActiveDangerAlert(prev => prev ? { ...prev, isAcknowledged: true } : null);
+    }
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
   };
 
-  const applyVoiceCorrection = (field: string, value: any) => {
-    if (field === 'weight') {
-      setActiveVisit(prev => ({
-        ...prev,
-        vitals: { ...prev.vitals, weight: value }
-      }));
-    } else if (field === 'bp') {
-      setActiveVisit(prev => ({
-        ...prev,
-        vitals: { ...prev.vitals, systolic: value.sys, diastolic: value.dia }
-      }));
-    } else if (field === 'headache') {
-      setActiveVisit(prev => ({
-        ...prev,
-        symptoms: {
-          ...prev.symptoms,
-          headache: { ...prev.symptoms.headache, severity: value }
-        }
-      }));
+  const clearDangerAlert = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
+    setActiveDangerAlert(null);
   };
 
   const confirmVisitAndSave = (asEscalated: boolean) => {
@@ -247,6 +441,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   return (
     <AppContext.Provider value={{
+      currentUser,
+      login,
+      logout,
       currentScreen,
       setCurrentScreen,
       activeBeneficiary,
@@ -269,9 +466,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       togglePlayAudio,
       seekAudio,
       isReadBackActive,
+      readBackState,
       startReadBack,
+      pauseReadBack,
+      resumeReadBack,
       stopReadBack,
+      interruptReadBackForCorrection,
       applyVoiceCorrection,
+      lastCorrectedMessage,
+      activeDangerAlert,
+      triggerDangerSign,
+      acknowledgeDangerAlert,
+      clearDangerAlert,
       isBeneficiaryModalOpen,
       setIsBeneficiaryModalOpen,
       isReferralModalOpen,

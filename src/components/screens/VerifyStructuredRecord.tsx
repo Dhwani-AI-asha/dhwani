@@ -14,7 +14,8 @@ import {
   Volume2,
   Mic,
   RotateCcw,
-  Sparkles
+  Sparkles,
+  CheckCircle2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -26,7 +27,8 @@ export const VerifyStructuredRecord: React.FC = () => {
     setCurrentScreen,
     startReadBack,
     isReadBackActive,
-    stopReadBack
+    stopReadBack,
+    triggerDangerSign
   } = useApp();
 
   // Local state for inline edits
@@ -96,11 +98,21 @@ export const VerifyStructuredRecord: React.FC = () => {
           <div>
             <div className="flex items-center space-x-2">
               <h3 className="text-base font-bold text-slate-900">{activeBeneficiary.name}</h3>
+              {activeVisit.lastCorrectedField === 'Beneficiary Name' && (
+                <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-2 py-0.2 rounded-full">
+                  Voice Updated ✓
+                </span>
+              )}
               <span className="text-xs text-slate-400 font-medium">RCH ID: {activeBeneficiary.rchId}</span>
               <span className="text-xs text-slate-500">Age {activeBeneficiary.age}</span>
             </div>
             <div className="flex items-center space-x-2 text-xs text-slate-500 mt-0.5">
-              <span className="text-slate-700 font-medium">Antenatal Care Visit #3</span>
+              <span className="text-slate-700 font-medium">{activeVisit.visitType}</span>
+              {activeVisit.lastCorrectedField === 'Visit Type' && (
+                <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-2 py-0.2 rounded-full">
+                  Voice Updated ✓
+                </span>
+              )}
               <span>•</span>
               <span>EDD: {activeBeneficiary.edd || '18 Dec 2024'}</span>
               <span>•</span>
@@ -136,40 +148,64 @@ export const VerifyStructuredRecord: React.FC = () => {
           </div>
           <div>
             <h4 className="text-xs font-bold text-teal-950 flex items-center space-x-2">
-              <span>Agent Voice Read-Back & Verification</span>
+              <span>Feature 2: Spoken Report Read-Back & Voice Correction</span>
               <span className="bg-teal-200/70 text-teal-800 text-[10px] px-2 py-0.2 rounded-full font-semibold">
                 Hands-Free Audio
               </span>
             </h4>
             <p className="text-[11px] text-teal-800 mt-0.5">
-              Listen to the extracted record read aloud in Hindi. Tap "Bol kar sudharein" or speak to correct any field.
+              Read structured visit summary aloud. Supports verbal corrections to weight, name, visit type, vaccines, and next date.
             </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-2 shrink-0">
-          {isReadBackActive ? (
-            <button
-              onClick={stopReadBack}
-              className="flex items-center space-x-1.5 bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition active:scale-95"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Interrupt / Stop Read-Back</span>
-            </button>
-          ) : (
-            <button
-              onClick={startReadBack}
-              className="flex items-center space-x-1.5 bg-teal-700 hover:bg-teal-800 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition active:scale-95"
-            >
-              <Volume2 className="w-3.5 h-3.5" />
-              <span>Read Aloud (सुनें)</span>
-            </button>
-          )}
+          <button
+            onClick={() => startReadBack()}
+            className="flex items-center space-x-1.5 bg-teal-700 hover:bg-teal-800 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition active:scale-95"
+          >
+            <Volume2 className="w-3.5 h-3.5" />
+            <span>Read Report Aloud (सुनें)</span>
+          </button>
 
           <div className="hidden lg:flex items-center space-x-1 text-[11px] font-semibold text-slate-500 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
             <Mic className="w-3 h-3 text-teal-600" />
-            <span>Voice barge-in ready</span>
+            <span>Barge-in ready</span>
           </div>
+        </div>
+      </div>
+
+      {/* Feature 3 Quick Test Bar */}
+      <div className="bg-red-50/70 border border-red-200 rounded-2xl p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center space-x-2.5">
+          <ShieldAlert className="w-4 h-4 text-red-600 shrink-0" />
+          <div>
+            <span className="font-bold text-red-950">Feature 3 Demo: Immediate Danger-Sign Voice Alert</span>
+            <span className="text-[11px] text-red-800 block">
+              Interrupts any read-back, speaks urgent warning, and requires mandatory ASHA acknowledgement.
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            onClick={() => triggerDangerSign('DS-BLEEDING')}
+            className="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1.5 rounded-lg transition text-xs shadow-2xs"
+          >
+            🚨 Bleeding Alert
+          </button>
+          <button
+            onClick={() => triggerDangerSign('DS-PREECLAMPSIA')}
+            className="bg-red-100 hover:bg-red-200 text-red-800 font-bold px-3 py-1.5 rounded-lg border border-red-300 transition text-xs"
+          >
+            ⚠️ Pre-Eclampsia
+          </button>
+          <button
+            onClick={() => triggerDangerSign('DS-NEWBORN-FEVER')}
+            className="bg-red-100 hover:bg-red-200 text-red-800 font-bold px-3 py-1.5 rounded-lg border border-red-300 transition text-xs"
+          >
+            👶 Newborn Fever
+          </button>
         </div>
       </div>
 
@@ -254,14 +290,20 @@ export const VerifyStructuredRecord: React.FC = () => {
               <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 space-y-1">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-slate-700">Maternal Weight</span>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
-                    Speech
-                  </span>
+                  {activeVisit.lastCorrectedField === 'Maternal Weight' ? (
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded">
+                      Voice Updated ✓
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
+                      Speech
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-baseline space-x-1">
                   <input
                     type="number"
-                    value={editingWeight}
+                    value={activeVisit.vitals.weight}
                     onChange={(e) => handleWeightUpdate(Number(e.target.value))}
                     className="w-14 bg-white border border-slate-300 rounded px-1.5 py-0.5 text-sm font-bold text-slate-900 text-center"
                   />
@@ -272,17 +314,34 @@ export const VerifyStructuredRecord: React.FC = () => {
               </div>
             </div>
 
-            {/* Gestational Age */}
-            <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 flex items-center justify-between">
-              <div>
-                <span className="text-xs font-semibold text-slate-700 block">Gestational Age</span>
-                <span className="text-[10px] text-slate-400">Auto-computed from LMP: 14 Mar 2024</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-bold text-teal-800 bg-teal-100/70 px-2.5 py-1 rounded-lg">
+            {/* Gestational Age & Next Visit Date */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-slate-700 block">Gestational Age</span>
+                  <span className="text-[10px] text-slate-400">From LMP: 14 Mar 2024</span>
+                </div>
+                <span className="text-xs font-bold text-teal-800 bg-teal-100/70 px-2 py-1 rounded-lg">
                   32 Weeks
                 </span>
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+
+              <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="text-xs font-semibold text-slate-700 block">Next Visit Date</span>
+                    {activeVisit.lastCorrectedField === 'Next Visit Date' && (
+                      <span className="text-[9px] font-bold text-emerald-800 bg-emerald-100 px-1 rounded">
+                        Updated ✓
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-400">Scheduled Follow-up</span>
+                </div>
+                <div className="flex items-center space-x-1 text-xs font-bold text-teal-900 bg-teal-100/70 px-2 py-1 rounded-lg">
+                  <Calendar className="w-3 h-3 text-teal-700" />
+                  <span>{activeVisit.nextVisitDate}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -495,9 +554,15 @@ export const VerifyStructuredRecord: React.FC = () => {
               <div>
                 <div className="flex items-center space-x-2">
                   <span className="text-xs font-bold text-slate-800">TT-2 / Booster Dose</span>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
-                    ✓ Verified
-                  </span>
+                  {activeVisit.lastCorrectedField === 'Vaccination TT Booster' ? (
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded">
+                      Voice Updated ✓
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
+                      ✓ Verified
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Administered on 18 Sep 2024 (Rampur PHC)

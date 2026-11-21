@@ -1,4 +1,87 @@
-import { Beneficiary, FollowUpTask, StructuredVisitData, VisitHistoryItem } from '../types';
+import type { AshaWorker, Beneficiary, DangerSignAlert, FollowUpTask, StructuredVisitData, VisitHistoryItem } from '../types/index.ts';
+
+export const mockAshaWorkers: AshaWorker[] = [
+  {
+    id: 'ASHA-9041',
+    name: 'Sunita Devi',
+    ward: 'Ward 4',
+    subCenter: 'Community Health Sub-Center Rampur',
+    allocatedHouseholds: 6,
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'ASHA-9042',
+    name: 'Radha Verma',
+    ward: 'Ward 2',
+    subCenter: 'Community Health Sub-Center Rampur',
+    allocatedHouseholds: 8,
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'ASHA-9043',
+    name: 'Meena Bai',
+    ward: 'Ward 5',
+    subCenter: 'Community Health Sub-Center Rampur',
+    allocatedHouseholds: 5,
+    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'ASHA-9044',
+    name: 'Anita Sharma',
+    ward: 'Ward 1',
+    subCenter: 'Community Health Sub-Center Rampur',
+    allocatedHouseholds: 7,
+    avatarUrl: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=150&auto=format&fit=crop&q=80',
+  }
+];
+
+export const predefinedDangerSigns: DangerSignAlert[] = [
+  {
+    id: 'DS-BLEEDING',
+    ruleCode: 'ANC-APH-01',
+    title: 'Vaginal Bleeding during Pregnancy',
+    hindiTitle: 'गर्भावस्था में रक्तस्राव (एंटीपार्टम हेमरेज)',
+    severity: 'CRITICAL',
+    triggerObservation: 'Beneficiary reported active vaginal bleeding with lower abdominal tightness since this morning.',
+    hindiVoiceAlert: 'आपातकालीन चेतावनी! गर्भावस्था के दौरान रक्तस्राव देखा गया है। तुरंत प्राथमिक स्वास्थ्य केंद्र रेफर करें! 108 एम्बुलेंस बुलाएं!',
+    englishVoiceAlert: 'Emergency warning! Vaginal bleeding detected during pregnancy. Immediate PHC referral required. Dispatch ambulance 108.',
+    instruction: 'Do not perform digital vaginal examination. Keep patient lying down on left lateral position. Escort immediately to Rampur PHC.',
+    referralFacility: 'Rampur Primary Health Centre (PHC) - 2.8 km',
+    onDutyMO: 'Dr. Rajesh Varma (MBBS)',
+    ambulanceHelpline: 'Dial 108 / Rampur Unit Active',
+    isAcknowledged: false
+  },
+  {
+    id: 'DS-PREECLAMPSIA',
+    ruleCode: 'ANC-PIH-04',
+    title: 'Severe Pre-Eclampsia Alert',
+    hindiTitle: 'गंभीर प्री-एक्लेम्पसिया (उच्च रक्तचाप + सूजन + सिरदर्द)',
+    severity: 'HIGH',
+    triggerObservation: 'Blood pressure 148/94 mmHg with bilateral pedal edema and persistent severe frontal headache in 3rd trimester.',
+    hindiVoiceAlert: 'चेतावनी: उच्च रक्तचाप 148 बटा 94 और लगातार सिरदर्द। संभावित प्री-एक्लेम्पसिया। तुरंत प्राथमिक स्वास्थ्य केंद्र भेजें!',
+    englishVoiceAlert: 'Alert: High blood pressure with edema and persistent headache. Potential pre-eclampsia. Immediate PHC referral required.',
+    instruction: 'Arrange immediate escort to Rampur PHC for urine albumin screening and medical officer evaluation.',
+    referralFacility: 'Rampur Primary Health Centre (PHC) - 2.8 km',
+    onDutyMO: 'Dr. Rajesh Varma (MBBS)',
+    ambulanceHelpline: 'Dial 108 / Rampur Unit Active',
+    isAcknowledged: false
+  },
+  {
+    id: 'DS-NEWBORN-FEVER',
+    ruleCode: 'IMNCI-NB-02',
+    title: 'Newborn Danger Sign: High Fever & Inability to Feed',
+    hindiTitle: 'नवजात शिशु में तेज बुखार और दूध न पीना',
+    severity: 'CRITICAL',
+    triggerObservation: 'Day 7 newborn baby with axillary temperature 39.2°C (102.5°F), lethargic and unable to breastfeed.',
+    hindiVoiceAlert: 'आपातकालीन चेतावनी! नवजात शिशु को तेज बुखार और दूध पीने में असमर्थता। तुरंत प्राथमिक स्वास्थ्य केंद्र ले जाएं!',
+    englishVoiceAlert: 'Emergency newborn alert! Temperature 39.2 degrees with feeding inability. Immediate emergency transport required.',
+    instruction: 'Keep baby warm with Kangaroo Mother Care. Avoid cold sponges. Immediate transfer to Newborn Care Corner (NBCC) at Rampur PHC.',
+    referralFacility: 'Rampur PHC - Newborn Stabilization Unit (NBCC)',
+    onDutyMO: 'Dr. Rajesh Varma (MBBS)',
+    ambulanceHelpline: 'Dial 102 / Janani Shishu Express',
+    isAcknowledged: false
+  }
+];
 
 export const mockBeneficiaries: Beneficiary[] = [
   {
@@ -81,6 +164,7 @@ export const initialActiveVisit: StructuredVisitData = {
   beneficiary: mockBeneficiaries[0],
   visitType: 'Antenatal Care Visit #3 (Home ANC Follow-up)',
   visitDate: '24 Oct 2024',
+  nextVisitDate: '24 Nov 2024',
   audioDurationText: '01:42',
   languageDetected: 'Hindi (हिन्दी) with English Clinical Terms',
   confidenceScore: 98.4,

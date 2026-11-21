@@ -8,6 +8,15 @@ export type NavScreen =
   | 'visit-history' 
   | 'follow-ups';
 
+export interface AshaWorker {
+  id: string; // e.g. "ASHA-9041"
+  name: string; // e.g. "Sunita Devi"
+  ward: string; // e.g. "Ward 4"
+  subCenter: string; // e.g. "Community Health Sub-Center Rampur"
+  allocatedHouseholds: number;
+  avatarUrl: string;
+}
+
 export interface Beneficiary {
   id: string;
   name: string;
@@ -63,6 +72,12 @@ export interface ClinicalSymptoms {
     observation: string; // "Mild Pallor observed (Possible low iron)"
     recorded: boolean;
   };
+  bleeding?: {
+    present: boolean;
+    duration: string;
+    severity: string;
+    flagged: boolean;
+  };
 }
 
 export interface MedicationsNutrition {
@@ -105,6 +120,7 @@ export interface StructuredVisitData {
   beneficiary: Beneficiary;
   visitType: string;
   visitDate: string;
+  nextVisitDate: string;
   audioDurationText: string;
   languageDetected: string;
   confidenceScore: number;
@@ -119,6 +135,24 @@ export interface StructuredVisitData {
   };
   status: 'DRAFT' | 'PENDING_VERIFICATION' | 'ESCALATED' | 'CONFIRMED';
   originalTranscript: string;
+  lastCorrectedField?: string;
+  dangerAlertTriggered?: boolean;
+}
+
+export interface DangerSignAlert {
+  id: string;
+  ruleCode: string;
+  title: string;
+  hindiTitle: string;
+  severity: 'CRITICAL' | 'HIGH';
+  triggerObservation: string;
+  hindiVoiceAlert: string;
+  englishVoiceAlert: string;
+  instruction: string;
+  referralFacility: string;
+  onDutyMO: string;
+  ambulanceHelpline: string;
+  isAcknowledged: boolean;
 }
 
 export interface FollowUpTask {

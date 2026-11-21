@@ -8,7 +8,6 @@ import {
   Clock, 
   FileAudio, 
   Check, 
-  Wifi, 
   HardDrive,
   Users
 } from 'lucide-react';
@@ -21,10 +20,12 @@ export const Dashboard: React.FC = () => {
     setIsBeneficiaryModalOpen, 
     setIsCallMoModalOpen,
     followUpTasks,
-    toggleTaskCompletion
+    toggleTaskCompletion,
+    currentUser
   } = useApp();
 
   const pendingTasks = followUpTasks.slice(0, 2);
+  const workerFirstName = currentUser ? currentUser.name.split(' ')[0] : 'Sunita';
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
@@ -33,13 +34,13 @@ export const Dashboard: React.FC = () => {
         <div>
           <div className="flex items-center space-x-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Community Health Sub-Center Rampur</span>
+            <span>{currentUser?.subCenter || 'Community Health Sub-Center Rampur'}</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Namaste, Sunita ji
+            Namaste, {workerFirstName} ji
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Ready for today's community visits in Rampur Ward 4 • <span className="text-slate-700 font-medium">6 households allocated</span>
+            Ready for today's community visits in Rampur {currentUser?.ward || 'Ward 4'} • <span className="text-slate-700 font-medium">{currentUser?.allocatedHouseholds || 6} households allocated</span>
           </p>
         </div>
 
@@ -225,7 +226,7 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="flex items-center justify-between pt-2 text-xs">
             <span className="text-slate-600 font-medium">2 Home Visits Left</span>
-            <span className="text-slate-400 text-[11px]">Ward 4 Area</span>
+            <span className="text-slate-400 text-[11px]">{currentUser?.ward || 'Ward 4 Area'}</span>
           </div>
         </div>
       </div>
