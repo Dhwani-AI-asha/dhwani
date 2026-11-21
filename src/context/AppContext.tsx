@@ -20,6 +20,7 @@ import {
 } from '../data/mockData';
 import { voiceClient, VoiceStatus } from '../lib/voiceClient';
 import { speak, stopSpeaking } from '../lib/speak';
+import { generateReport, correctReport, ReportSuccess } from '../lib/reportApi';
 import { getAllStoredVisits, saveVisitRecord, calculateSyncCounts } from '../services/offlineDB';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
@@ -59,7 +60,11 @@ interface AppContextType {
   liveTranscript: string;
   voiceStatus: VoiceStatus;
   voiceError: string | null;
-  
+  reportResult: ReportSuccess | null;
+reportError: string | null;
+isReportLoading: boolean;
+replayReport: () => void;
+submitCorrection: (correction: string) => Promise<void>;
   // Audio playback states
   isPlayingAudio: boolean;
   audioCurrentTime: number;
@@ -223,6 +228,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [liveTranscript, setLiveTranscript] = useState<string>('');
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [reportResult, setReportResult] = useState<ReportSuccess | null>(null);
+const [reportError, setReportError] = useState<string | null>(null);
+const [isReportLoading, setIsReportLoading] = useState<boolean>(false);
+const reportRequestIdRef = useRef<number>(0);
 
   const liveTranscriptRef = useRef<string>('');
   const recordingSessionIdRef = useRef<number>(0);
@@ -336,6 +345,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const startRecording = async () => {
     const currentSessionId = ++recordingSessionIdRef.current;
+        reportRequestIdRef.current++;
+    setReportResult(null);
+    setReportError(null);
+    setIsReportLoading(false);
     setLiveSegments([]);
     setLiveTranscript('');
     liveTranscriptRef.current = '';
@@ -380,6 +393,53 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   };
 
+    const runReport = async (transcript: string) => {
+    const requestId = ++reportRequestIdRef.current;
+    setReportResult(null);
+    setReportError(null);
+    setIsReportLoading(true);
+
+    const result = await generateReport(transcript);
+
+    if (reportRequestIdRef.current !== requestId) return;
+    setIsReportLoading(false);
+
+    if (result.ok) {
+      setReportResult(result);
+      await speak(result.narration_speech, 'hi-IN');
+    } else {
+      setReportError(result.error);
+    }
+  };
+
+  const replayReport = () => {
+    if (reportResult) {
+      void speak(reportResult.narration_speech, 'hi-IN');
+    }
+  };
+
+  const submitCorrection = async (correction: string) => {
+    const base = reportResult?.transcript_used;
+    const text = correction.trim();
+    if (!base || !text) return;
+
+    const requestId = ++reportRequestIdRef.current;
+    stopSpeaking();
+    setReportError(null);
+    setIsReportLoading(true);
+
+    const result = await correctReport(base, text);
+
+    if (reportRequestIdRef.current !== requestId) return;
+    setIsReportLoading(false);
+
+    if (result.ok) {
+      setReportResult(result);
+      await speak(result.narration_speech, 'hi-IN');
+    } else {
+      setReportError(result.error);
+    }
+  };
   const stopRecordingAndReview = () => {
     recordingSessionIdRef.current++;
     stopSpeaking();
@@ -389,11 +449,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     // Save joined text into activeVisit.originalTranscript
     const joinedText = liveTranscriptRef.current.trim();
-    if (joinedText) {
+        if (joinedText) {
       setActiveVisit(prev => ({
         ...prev,
         originalTranscript: joinedText,
       }));
+      void runReport(joinedText);
+    } else {
+      setReportError('no_transcript');
     }
 
     setCurrentScreen('review-transcript');
@@ -402,6 +465,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const cancelRecording = () => {
     recordingSessionIdRef.current++;
     stopSpeaking();
+        reportRequestIdRef.current++;
+    setIsReportLoading(false);
     voiceClient.stop();
     setIsRecording(false);
     setIsPaused(false);
@@ -713,6 +778,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       liveTranscript,
       voiceStatus,
       voiceError,
+      reportResult,
+      reportError,
+      isReportLoading,
+      replayReport,
+      submitCorrection,
       isPlayingAudio,
       audioCurrentTime,
       togglePlayAudio,

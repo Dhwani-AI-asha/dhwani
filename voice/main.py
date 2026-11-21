@@ -38,6 +38,9 @@ HEADERS = {
 
 app = FastAPI(title="Voice STT Backend")
 
+from report_api import router as report_router  # noqa: E402
+app.include_router(report_router)
+
 # Enable CORS for frontend requests
 app.add_middleware(
     CORSMiddleware,

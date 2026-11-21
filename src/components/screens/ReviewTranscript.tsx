@@ -24,13 +24,19 @@ export const ReviewTranscript: React.FC = () => {
     isPlayingAudio,
     audioCurrentTime,
     togglePlayAudio,
-    seekAudio
+    seekAudio,
+    reportResult,
+    reportError,
+    isReportLoading,
+    replayReport,
+    submitCorrection
   } = useApp();
 
   const [isEditingInline, setIsEditingInline] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1.0x' | '1.2x' | '1.5x'>('1.0x');
   const [isMuted, setIsMuted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [correctionText, setCorrectionText] = useState('');
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const navTimeoutRef = useRef<any>(null);
 
@@ -280,6 +286,59 @@ export const ReviewTranscript: React.FC = () => {
             DHWANI detected early signs of gestational hypertension (BP 130/85 with new bilateral pedal edema & headache). Once verified, the next screen will formulate the PHC referral slip and emergency follow-up alert.
           </p>
         </div>
+      </div>
+
+      {/* Spoken Read-Back & Correction */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-3">
+        <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+          <span>AI Read-Back of Visit Report</span>
+          {reportResult && (
+            <button
+              onClick={replayReport}
+              className="text-teal-700 bg-teal-50 hover:bg-teal-100 px-3 py-1 rounded-lg border border-teal-200 transition"
+            >
+              Replay read-back
+            </button>
+          )}
+        </div>
+
+        {isReportLoading && (
+          <p className="text-xs text-slate-500 italic">Preparing report and read-back...</p>
+        )}
+
+        {reportError && (
+          <p role="alert" className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
+            Report service error: {reportError}
+          </p>
+        )}
+
+        {reportResult && (
+          <>
+            <p className="text-xs text-slate-700 leading-relaxed">
+              {String((reportResult.report as { summary?: string }).summary ?? '')}
+            </p>
+            <p className="text-[11px] text-slate-400">{reportResult.disclaimer}</p>
+
+            <div className="flex items-center gap-2">
+              <input
+                value={correctionText}
+                onChange={(e) => setCorrectionText(e.target.value)}
+                placeholder="Correction, e.g. Sunita ka weight 3.1 kilo hai"
+                className="flex-1 text-xs border border-slate-200 rounded-xl px-3 py-2"
+              />
+              <button
+                onClick={async () => {
+                  await submitCorrection(correctionText);
+                  setCorrectionText('');
+                }}
+                disabled={isReportLoading || !correctionText.trim()}
+                className="text-xs font-bold text-white bg-teal-700 hover:bg-teal-800 px-4 py-2 rounded-xl disabled:opacity-50"
+              >
+                Apply correction
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Save Status / Error Message */}
