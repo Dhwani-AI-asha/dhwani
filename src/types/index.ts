@@ -6,7 +6,8 @@ export type NavScreen =
   | 'clinical-alerts' 
   | 'beneficiaries' 
   | 'visit-history' 
-  | 'follow-ups';
+  | 'follow-ups'
+  | 'sync-centre';
 
 export interface AshaWorker {
   id: string; // e.g. "ASHA-9041"
@@ -188,3 +189,25 @@ export interface VisitHistoryItem {
   category: 'anc' | 'immunization' | 'ncd' | 'pnc';
   isAlert: boolean;
 }
+
+export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'failed';
+
+export interface SyncCounts {
+  pending: number;
+  syncing: number;
+  synced: number;
+  failed: number;
+  totalRequiringAttention: number; // pending + failed
+  total: number;
+}
+
+export interface StoredVisitRecord {
+  id: string;
+  visitData: StructuredVisitData;
+  syncStatus: SyncStatus;
+  createdAt: string;
+  updatedAt: string;
+  syncAttempts?: number;
+  lastSyncError?: string;
+}
+

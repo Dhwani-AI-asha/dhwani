@@ -5,6 +5,7 @@ import {
   Users, 
   FileText, 
   CalendarCheck,
+  RefreshCw,
   Activity,
   LogOut
 } from 'lucide-react';
@@ -12,7 +13,7 @@ import { useApp } from '../../context/AppContext';
 import { NavScreen } from '../../types';
 
 export const Sidebar: React.FC = () => {
-  const { currentScreen, setCurrentScreen, startRecording, currentUser, logout } = useApp();
+  const { currentScreen, setCurrentScreen, startRecording, currentUser, logout, syncCounts, pendingAttentionCount } = useApp();
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -20,6 +21,13 @@ export const Sidebar: React.FC = () => {
     { id: 'beneficiaries', label: 'Beneficiaries', icon: Users },
     { id: 'visit-history', label: 'Visit History', icon: FileText },
     { id: 'follow-ups', label: 'Follow-ups', icon: CalendarCheck },
+    { 
+      id: 'sync-centre', 
+      label: 'Sync Centre', 
+      icon: RefreshCw, 
+      badge: pendingAttentionCount > 0 ? String(pendingAttentionCount) : undefined,
+      badgeVariant: syncCounts.failed > 0 ? 'red' : 'amber'
+    },
   ];
 
   const handleNavClick = (id: string) => {
@@ -79,6 +87,10 @@ export const Sidebar: React.FC = () => {
                     className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
                       active
                         ? 'bg-teal-600 text-teal-100 border border-teal-500'
+                        : item.badgeVariant === 'red'
+                        ? 'bg-red-100 text-red-800 border border-red-200'
+                        : item.badgeVariant === 'amber'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-200'
                         : 'bg-emerald-100 text-emerald-800'
                     }`}
                   >
@@ -108,8 +120,10 @@ export const Sidebar: React.FC = () => {
                 ASHA • {currentUser?.ward || "Ward 4"}, Rampur
               </p>
               <div className="flex items-center space-x-1.5 mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span className="text-[10px] font-semibold text-emerald-700">Synced with PHC</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${pendingAttentionCount > 0 ? (syncCounts.failed > 0 ? 'bg-red-500' : 'bg-amber-500') : 'bg-emerald-500'}`}></span>
+                <span className={`text-[10px] font-semibold ${pendingAttentionCount > 0 ? (syncCounts.failed > 0 ? 'text-red-700' : 'text-amber-700') : 'text-emerald-700'}`}>
+                  {pendingAttentionCount > 0 ? `${pendingAttentionCount} Awaiting Sync` : 'Local Visits In Sync'}
+                </span>
               </div>
             </div>
           </div>

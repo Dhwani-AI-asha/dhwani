@@ -23,7 +23,10 @@ export const ClinicalSafetyAlerts: React.FC = () => {
     setCurrentScreen, 
     setIsReferralModalOpen, 
     setIsCallMoModalOpen,
-    confirmVisitAndSave
+    confirmVisitAndSave,
+    isSavingVisit,
+    visitSaveError,
+    clearVisitSaveError
   } = useApp();
 
   // Counseling checklist state
@@ -332,6 +335,27 @@ export const ClinicalSafetyAlerts: React.FC = () => {
         </div>
       </div>
 
+      {/* Save Error Alert Banner */}
+      {visitSaveError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start justify-between gap-3 text-xs text-red-800 animate-fadeIn">
+          <div className="flex items-start space-x-2.5">
+            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <div className="font-bold text-red-900">
+                रिकॉर्ड सहेजने में विफल / Failed to Save Visit Locally
+              </div>
+              <p className="text-red-700 mt-0.5">{visitSaveError}</p>
+            </div>
+          </div>
+          <button
+            onClick={clearVisitSaveError}
+            className="text-[11px] font-semibold text-red-700 hover:text-red-900 underline shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Bottom Footer Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-200/80">
         <button
@@ -345,17 +369,19 @@ export const ClinicalSafetyAlerts: React.FC = () => {
 
         <div className="flex items-center space-x-3">
           <button
+            disabled={isSavingVisit}
             onClick={() => confirmVisitAndSave(false)}
-            className="text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-4 py-2.5 rounded-xl transition"
+            className="text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-4 py-2.5 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Save as Regular Follow-up
+            {isSavingVisit ? 'Saving to device...' : 'Save as Regular Follow-up'}
           </button>
 
           <button
+            disabled={isSavingVisit}
             onClick={() => confirmVisitAndSave(true)}
-            className="flex items-center space-x-2 bg-teal-700 hover:bg-teal-800 text-white px-6 py-3 rounded-xl text-xs font-bold shadow-md shadow-teal-900/10 transition active:scale-95"
+            className="flex items-center space-x-2 bg-teal-700 hover:bg-teal-800 text-white px-6 py-3 rounded-xl text-xs font-bold shadow-md shadow-teal-900/10 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <span>Save Visit & Create PHC Referral Slip</span>
+            <span>{isSavingVisit ? 'Saving to device...' : 'Save Visit & Create PHC Referral Slip'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

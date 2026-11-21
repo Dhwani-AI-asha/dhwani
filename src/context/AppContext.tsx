@@ -1,11 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback, ReactNode } from 'react';
 import { 
   AshaWorker,
   Beneficiary, 
   DangerSignAlert,
   FollowUpTask, 
   NavScreen, 
+  StoredVisitRecord,
   StructuredVisitData, 
+  SyncCounts,
   VisitHistoryItem 
 } from '../types';
 import { 
@@ -17,6 +19,8 @@ import {
   predefinedDangerSigns
 } from '../data/mockData';
 import { voiceClient, VoiceStatus } from '../lib/voiceClient';
+import { getAllStoredVisits, saveVisitRecord, calculateSyncCounts } from '../services/offlineDB';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 interface AppContextType {
   // Authentication
@@ -35,6 +39,12 @@ interface AppContextType {
   setFollowUpTasks: React.Dispatch<React.SetStateAction<FollowUpTask[]>>;
   visitHistory: VisitHistoryItem[];
   setVisitHistory: React.Dispatch<React.SetStateAction<VisitHistoryItem[]>>;
+  storedVisits: StoredVisitRecord[];
+  isOfflineDBLoaded: boolean;
+  isOnline: boolean;
+  syncCounts: SyncCounts;
+  pendingAttentionCount: number;
+  refreshStoredVisits: () => Promise<void>;
   
   // Voice & Recording states
   isRecording: boolean;
@@ -80,8 +90,14 @@ interface AppContextType {
   isCallMoModalOpen: boolean;
   setIsCallMoModalOpen: (open: boolean) => void;
 
+  // Offline persistence & visit state
+  isSavingVisit: boolean;
+  visitSaveError: string | null;
+  clearVisitSaveError: () => void;
+  dbRestoreError: string | null;
+
   // Helper actions
-  confirmVisitAndSave: (asEscalated: boolean) => void;
+  confirmVisitAndSave: (asEscalated: boolean) => Promise<boolean>;
   toggleTaskCompletion: (taskId: string) => void;
 }
 
@@ -107,6 +123,96 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [activeVisit, setActiveVisit] = useState<StructuredVisitData>(initialActiveVisit);
   const [followUpTasks, setFollowUpTasks] = useState<FollowUpTask[]>(mockFollowUpTasks);
   const [visitHistory, setVisitHistory] = useState<VisitHistoryItem[]>(mockVisitHistory);
+  const [storedVisits, setStoredVisits] = useState<StoredVisitRecord[]>([]);
+  const [isOfflineDBLoaded, setIsOfflineDBLoaded] = useState<boolean>(false);
+  const [isSavingVisit, setIsSavingVisit] = useState<boolean>(false);
+  const [visitSaveError, setVisitSaveError] = useState<string | null>(null);
+  const [dbRestoreError, setDbRestoreError] = useState<string | null>(null);
+
+  // Monitor real-time browser network status
+  const { isOnline } = useNetworkStatus();
+
+  // Compute pending, syncing, synced, and failed counts from stored visits
+  const syncCounts: SyncCounts = useMemo(() => {
+    return calculateSyncCounts(storedVisits);
+  }, [storedVisits]);
+
+  const pendingAttentionCount = syncCounts.totalRequiringAttention;
+
+  const refreshStoredVisits = useCallback(async () => {
+    try {
+      const records = await getAllStoredVisits();
+      setStoredVisits(records);
+    } catch (err) {
+      console.warn('[AppContext] Failed to refresh stored visits:', err);
+    }
+  }, []);
+
+  // Restore saved visits from IndexedDB on startup while preserving mock data
+  useEffect(() => {
+    let isMounted = true;
+    getAllStoredVisits()
+      .then((records) => {
+        if (!isMounted) return;
+        setStoredVisits(records);
+        setIsOfflineDBLoaded(true);
+        setDbRestoreError(null);
+
+        if (Array.isArray(records) && records.length > 0) {
+          try {
+            // Convert stored IndexedDB visit records to VisitHistoryItems
+            const restoredHistoryItems: VisitHistoryItem[] = records
+              .filter((rec) => rec && rec.visitData && rec.visitData.beneficiary)
+              .map((rec) => {
+                const isEscalated = rec.visitData.status === 'ESCALATED';
+                const dateObj = new Date(rec.createdAt);
+                const timeStr = !isNaN(dateObj.getTime())
+                  ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : 'Earlier';
+
+                return {
+                  id: rec.id,
+                  beneficiaryName: rec.visitData.beneficiary.name,
+                  spouseName: rec.visitData.beneficiary.spouseName,
+                  age: rec.visitData.beneficiary.age,
+                  rchId: rec.visitData.beneficiary.rchId,
+                  visitType: rec.visitData.visitType,
+                  timestampText: `Offline • ${timeStr}`,
+                  statusBadge: isEscalated ? 'PHC Referral Flagged' : 'Complete',
+                  statusType: isEscalated ? 'red' : 'green',
+                  audioDuration: rec.visitData.audioDurationText || 'Voice Recorded',
+                  vitalsSummary: isEscalated
+                    ? `⚠️ Vitals: BP ${rec.visitData.vitals?.systolic || 0}/${rec.visitData.vitals?.diastolic || 0} mmHg • Bilateral Edema • Flagged`
+                    : `Normal visit • Weight ${rec.visitData.vitals?.weight || 0}kg • BP ${rec.visitData.vitals?.systolic || 0}/${rec.visitData.vitals?.diastolic || 0}`,
+                  hasReferralSlip: isEscalated,
+                  category: 'anc',
+                  isAlert: isEscalated,
+                };
+              });
+
+            // Prepend restored local offline records ahead of default mock history, avoiding duplicate IDs
+            setVisitHistory((prev) => {
+              const existingIds = new Set(prev.map((item) => item.id));
+              const newRestored = restoredHistoryItems.filter((item) => !existingIds.has(item.id));
+              return [...newRestored, ...prev];
+            });
+          } catch (parseErr) {
+            console.error('[AppContext] Error parsing restored visits:', parseErr);
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('[AppContext] Failed to load offline visits from IndexedDB:', err);
+        if (isMounted) {
+          setIsOfflineDBLoaded(true);
+          setDbRestoreError(err instanceof Error ? err.message : String(err));
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Voice & Recording states
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -458,54 +564,85 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setActiveDangerAlert(null);
   };
 
-  const confirmVisitAndSave = (asEscalated: boolean) => {
-    const updatedStatus = asEscalated ? 'ESCALATED' : 'CONFIRMED';
-    setActiveVisit(prev => ({ ...prev, status: updatedStatus }));
+  const confirmVisitAndSave = async (asEscalated: boolean): Promise<boolean> => {
+    setVisitSaveError(null);
+    setIsSavingVisit(true);
 
-    // Add to Visit History
-    const newHistoryItem: VisitHistoryItem = {
-      id: `vis-${Date.now()}`,
-      beneficiaryName: activeBeneficiary.name,
-      spouseName: activeBeneficiary.spouseName,
-      age: activeBeneficiary.age,
-      rchId: activeBeneficiary.rchId,
-      visitType: activeVisit.visitType,
-      timestampText: 'Just now, 11:05 AM',
-      statusBadge: asEscalated ? 'PHC Referral Flagged' : 'Complete',
-      statusType: asEscalated ? 'red' : 'green',
-      audioDuration: `Hindi (${Math.floor(recordingSeconds / 60)}:${(recordingSeconds % 60).toString().padStart(2, '0')})`,
-      vitalsSummary: asEscalated 
-        ? `⚠️ Vitals: BP ${activeVisit.vitals.systolic}/${activeVisit.vitals.diastolic} mmHg • Bilateral Edema • Headache`
-        : `Normal visit • Weight ${activeVisit.vitals.weight}kg • BP ${activeVisit.vitals.systolic}/${activeVisit.vitals.diastolic}`,
-      hasReferralSlip: asEscalated,
-      category: 'anc',
-      isAlert: asEscalated
+    const updatedStatus: 'ESCALATED' | 'CONFIRMED' = asEscalated ? 'ESCALATED' : 'CONFIRMED';
+    
+    // Construct the complete, updated visit data snapshot synchronously to prevent stale state issues
+    const completeUpdatedVisit: StructuredVisitData = {
+      ...activeVisit,
+      beneficiary: { ...activeBeneficiary },
+      status: updatedStatus,
+      dangerAlertTriggered: asEscalated || activeVisit.dangerAlertTriggered,
+      audioDurationText: activeVisit.audioDurationText || `Hindi (${Math.floor(recordingSeconds / 60)}:${(recordingSeconds % 60).toString().padStart(2, '0')})`
     };
 
-    setVisitHistory(prev => [newHistoryItem, ...prev]);
+    try {
+      // 1. Wait for IndexedDB persistence before updating history and navigating away
+      const savedRecord = await saveVisitRecord(completeUpdatedVisit, { syncStatus: 'pending' });
 
-    // Add urgent follow-up task if escalated
-    if (asEscalated) {
-      const urgentTask: FollowUpTask = {
-        id: `task-urgent-${Date.now()}`,
-        title: `Escort ${activeBeneficiary.name} to Rampur PHC for BP & Albumin Evaluation`,
-        beneficiaryName: `${activeBeneficiary.name} (Age ${activeBeneficiary.age}, ${activeBeneficiary.stage})`,
-        beneficiarySubtitle: `${activeBeneficiary.village}, ${activeBeneficiary.gali || ''} • ${activeBeneficiary.contactNumber || ''}`,
-        category: 'urgent',
-        priorityBadge: `Urgent Action Needed • Due: Today by 02:00 PM • Flagged Visit`,
-        badgeType: 'red',
-        dueText: 'Today by 02:00 PM',
-        contactNumber: activeBeneficiary.contactNumber,
-        detailsNote: 'Clinical Flag: Elevated BP + bilateral pedal edema + persistent headache. Suspected pre-eclampsia protocol.',
-        actionButtonText: 'Confirm PHC Visit',
-        secondaryButtonText: 'Call Beneficiary',
-        isCompleted: false
+      // 2. Update active visit state and stored visits
+      setActiveVisit(completeUpdatedVisit);
+      setStoredVisits(prev => [savedRecord, ...prev.filter(r => r.id !== savedRecord.id)]);
+
+      // 3. Add to Visit History
+      const newHistoryItem: VisitHistoryItem = {
+        id: savedRecord.id || `vis-${Date.now()}`,
+        beneficiaryName: activeBeneficiary.name,
+        spouseName: activeBeneficiary.spouseName,
+        age: activeBeneficiary.age,
+        rchId: activeBeneficiary.rchId,
+        visitType: activeVisit.visitType,
+        timestampText: 'Just now, 11:05 AM',
+        statusBadge: asEscalated ? 'PHC Referral Flagged' : 'Complete',
+        statusType: asEscalated ? 'red' : 'green',
+        audioDuration: `Hindi (${Math.floor(recordingSeconds / 60)}:${(recordingSeconds % 60).toString().padStart(2, '0')})`,
+        vitalsSummary: asEscalated 
+          ? `⚠️ Vitals: BP ${activeVisit.vitals.systolic}/${activeVisit.vitals.diastolic} mmHg • Bilateral Edema • Headache`
+          : `Normal visit • Weight ${activeVisit.vitals.weight}kg • BP ${activeVisit.vitals.systolic}/${activeVisit.vitals.diastolic}`,
+        hasReferralSlip: asEscalated,
+        category: 'anc',
+        isAlert: asEscalated
       };
-      setFollowUpTasks(prev => [urgentTask, ...prev]);
-    }
 
-    // Navigate to Visit History or Follow-ups
-    setCurrentScreen(asEscalated ? 'follow-ups' : 'visit-history');
+      setVisitHistory(prev => [newHistoryItem, ...prev]);
+
+      // 4. Add urgent follow-up task if escalated
+      if (asEscalated) {
+        const urgentTask: FollowUpTask = {
+          id: `task-urgent-${Date.now()}`,
+          title: `Escort ${activeBeneficiary.name} to Rampur PHC for BP & Albumin Evaluation`,
+          beneficiaryName: `${activeBeneficiary.name} (Age ${activeBeneficiary.age}, ${activeBeneficiary.stage})`,
+          beneficiarySubtitle: `${activeBeneficiary.village}, ${activeBeneficiary.gali || ''} • ${activeBeneficiary.contactNumber || ''}`,
+          category: 'urgent',
+          priorityBadge: `Urgent Action Needed • Due: Today by 02:00 PM • Flagged Visit`,
+          badgeType: 'red',
+          dueText: 'Today by 02:00 PM',
+          contactNumber: activeBeneficiary.contactNumber,
+          detailsNote: 'Clinical Flag: Elevated BP + bilateral pedal edema + persistent headache. Suspected pre-eclampsia protocol.',
+          actionButtonText: 'Confirm PHC Visit',
+          secondaryButtonText: 'Call Beneficiary',
+          isCompleted: false
+        };
+        setFollowUpTasks(prev => [urgentTask, ...prev]);
+      }
+
+      setIsSavingVisit(false);
+      setVisitSaveError(null);
+
+      // 5. Navigate to Visit History or Follow-ups ONLY after successful persistence
+      setCurrentScreen(asEscalated ? 'follow-ups' : 'visit-history');
+      return true;
+    } catch (err: any) {
+      console.error('[AppContext] Error saving visit to IndexedDB:', err);
+      const errorMessage = err?.message || 'Failed to save visit record to device storage. Please try again.';
+      setVisitSaveError(errorMessage);
+      setIsSavingVisit(false);
+      // DO NOT navigate away, DO NOT add to visit history, DO NOT add follow-up task
+      return false;
+    }
   };
 
   const toggleTaskCompletion = (taskId: string) => {
@@ -529,6 +666,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setFollowUpTasks,
       visitHistory,
       setVisitHistory,
+      storedVisits,
+      isOfflineDBLoaded,
+      isOnline,
+      syncCounts,
+      pendingAttentionCount,
+      refreshStoredVisits,
+      isSavingVisit,
+      visitSaveError,
+      clearVisitSaveError: () => setVisitSaveError(null),
+      dbRestoreError,
       isRecording,
       recordingSeconds,
       isPaused,

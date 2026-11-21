@@ -11,6 +11,7 @@ import { ClinicalSafetyAlerts } from './components/screens/ClinicalSafetyAlerts'
 import { VisitHistory } from './components/screens/VisitHistory';
 import { FollowUps } from './components/screens/FollowUps';
 import { Beneficiaries } from './components/screens/Beneficiaries';
+import { SyncCentre } from './components/screens/SyncCentre';
 import { BeneficiaryModal } from './components/modals/BeneficiaryModal';
 import { ReferralSlipModal } from './components/modals/ReferralSlipModal';
 import { CallMoModal } from './components/modals/CallMoModal';
@@ -43,6 +44,7 @@ const AppContent: React.FC = () => {
           {currentScreen === 'visit-history' && <VisitHistory />}
           {currentScreen === 'follow-ups' && <FollowUps />}
           {currentScreen === 'beneficiaries' && <Beneficiaries />}
+          {currentScreen === 'sync-centre' && <SyncCentre />}
         </main>
       </div>
 
