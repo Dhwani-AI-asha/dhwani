@@ -458,6 +458,73 @@ def test_workflow_deletion_and_cascade_behavior():
         Base.metadata.drop_all(bind=test_engine)
 
 
+def test_patient_deletion_with_loaded_visits_cascades_successfully():
+    """
+    Regression test for Step 8 audit finding:
+    Verifies that deleting a Patient with Visit records already loaded in the ORM session
+    cascades and deletes associated Visits without throwing NOT NULL constraint failed on visits.patient_id,
+    and leaves no orphan visit records.
+    """
+    test_engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool
+    )
+    Base.metadata.create_all(bind=test_engine)
+    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+    session = TestingSession()
+
+    try:
+        # 1. Create a patient
+        patient = Patient(
+            patient_id="PAT-CASCADE-LOADED",
+            name="Sita Devi",
+            age=29,
+            gender="Female",
+            contact_number="9876501234",
+            address="Village Rampur"
+        )
+        session.add(patient)
+        session.commit()
+
+        # 2. Create one or more visits linked to that patient
+        visit1 = Visit(
+            visit_id="VIS-CASCADE-L1",
+            patient_id="PAT-CASCADE-LOADED",
+            visit_date=date(2026, 11, 1),
+            report={"chief_complaint": "Headache and mild fever"}
+        )
+        visit2 = Visit(
+            visit_id="VIS-CASCADE-L2",
+            patient_id="PAT-CASCADE-LOADED",
+            visit_date=date(2026, 11, 15),
+            report={"chief_complaint": "Follow-up visit"}
+        )
+        session.add_all([visit1, visit2])
+        session.commit()
+
+        # 3. Ensure visits are loaded into the ORM session
+        loaded_patient = session.query(Patient).filter(Patient.patient_id == "PAT-CASCADE-LOADED").first()
+        assert loaded_patient is not None
+        assert len(loaded_patient.visits) == 2
+        assert {v.visit_id for v in loaded_patient.visits} == {"VIS-CASCADE-L1", "VIS-CASCADE-L2"}
+
+        # 4. Delete the patient without manually deleting visits first
+        session.delete(loaded_patient)
+        session.commit()
+
+        # 5. Verifies patient and visit records are deleted successfully
+        assert session.query(Patient).filter(Patient.patient_id == "PAT-CASCADE-LOADED").first() is None
+        assert session.query(Visit).filter(Visit.visit_id.in_(["VIS-CASCADE-L1", "VIS-CASCADE-L2"])).all() == []
+
+        # 6. Verifies no integrity error or orphan records occur
+        remaining_visits = session.query(Visit).all()
+        assert len(remaining_visits) == 0
+    finally:
+        session.close()
+        Base.metadata.drop_all(bind=test_engine)
+
+
 # ============================================================================
 # WORKFLOW 6: Health and Root Endpoints
 # ============================================================================

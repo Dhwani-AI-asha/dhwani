@@ -136,7 +136,7 @@ SQLite database is created automatically at `backend/db.sqlite3` on first startu
 
 ## 3. API Reference
 
-All endpoints are prefixed with `/api/v1/`. Public IDs follow the format `PAT-YYYY-NNNN`, `VIS-YYYY-NNNN`, `PRO-YYYY-NNNN`, `REF-YYYY-NNNN`, `REM-YYYY-NNNN`. Internal numeric primary keys are never exposed.
+All endpoints are prefixed with `/api/v1/`. Public IDs follow the format `PAT-YYYY-NNNN`, `VIS-YYYY-NNNN`, `CP-YYYY-NNNN`, `REF-YYYY-NNNN`, `MED-YYYY-NNNN`. Internal numeric primary keys are never exposed.
 
 ---
 
@@ -310,7 +310,7 @@ Care promises record follow-up commitments made during a visit.
 
 ```json
 {
-  "promise_id": "PRO-2026-0001",
+  "promise_id": "CP-2026-0001",
   "patient_id": "PAT-2026-0001",
   "visit_id": "VIS-2026-0001",
   "description": "Schedule immunisation for child",
@@ -420,7 +420,7 @@ Generates a factual, read-only pre-visit briefing for an ASHA worker. **This end
   ],
   "pending_promises": [
     {
-      "promise_id": "PRO-2026-0002",
+      "promise_id": "CP-2026-0002",
       "description": "Schedule immunisation",
       "due_date": "2026-12-01",
       "status": "Pending",
@@ -429,7 +429,7 @@ Generates a factual, read-only pre-visit briefing for an ASHA worker. **This end
   ],
   "overdue_promises": [
     {
-      "promise_id": "PRO-2026-0001",
+      "promise_id": "CP-2026-0001",
       "description": "Follow up on blood test",
       "due_date": "2026-11-10",
       "status": "Pending",
@@ -565,7 +565,7 @@ Partial update — omitted fields remain unchanged.
 
 ```json
 {
-  "reminder_id": "REM-2026-0001",
+  "reminder_id": "MED-2026-0001",
   "patient_id": "PAT-2026-0001",
   "visit_id": "VIS-2026-0001",
   "medication_name": "Ferrous Sulphate 200mg",
@@ -748,9 +748,9 @@ GET /api/v1/patients/{patient_id}/medication-reminders?status=Active
 |---|---|---|
 | Patient | `PAT-YYYY-NNNN` | `PAT-2026-0001` |
 | Visit | `VIS-YYYY-NNNN` | `VIS-2026-0003` |
-| Care Promise | `PRO-YYYY-NNNN` | `PRO-2026-0001` |
+| Care Promise | `CP-YYYY-NNNN` | `CP-2026-0001` |
 | Referral | `REF-YYYY-NNNN` | `REF-2026-0002` |
-| Medication Reminder | `REM-YYYY-NNNN` | `REM-2026-0001` |
+| Medication Reminder | `MED-YYYY-NNNN` | `MED-2026-0001` |
 
 ---
 

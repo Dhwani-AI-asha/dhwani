@@ -4,7 +4,7 @@ SQLAlchemy Visit model for storing longitudinal visit records and Member 2 struc
 
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Date, DateTime, JSON, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 
 from app.database import Base
 
@@ -35,7 +35,11 @@ class Visit(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     # Relationship to Patient
-    patient = relationship("Patient", backref="visits")
+    patient = relationship(
+        "Patient",
+        backref=backref("visits", cascade="all, delete-orphan", passive_deletes=True),
+        passive_deletes=True
+    )
 
     def __repr__(self) -> str:
         return f"<Visit(visit_id='{self.visit_id}', patient_id='{self.patient_id}', visit_date={self.visit_date})>"
