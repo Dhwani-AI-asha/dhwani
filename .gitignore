@@ -41,3 +41,5 @@ lerna-debug.log*
 *.mp4
 *.m4a
 __pycache__/
+
+.vite/
